@@ -7,6 +7,8 @@ import argparse
 parser = argparse.ArgumentParser(description='Run keypoint detection')
 parser.add_argument("--device", default="cpu", help="Device to inference on")
 parser.add_argument("--image_file", default="group.jpg", help="Input image")
+parser.add_argument("--protoFile", default="group.jpg", help="Input image")
+parser.add_argument("--weightsFile", default="group.jpg", help="Input image")
 
 args = parser.parse_args()
 
@@ -14,8 +16,8 @@ args = parser.parse_args()
 
 image1 = cv2.imread(args.image_file)
 
-protoFile = "pose/coco/pose_deploy_linevec.prototxt"
-weightsFile = "pose/coco/pose_iter_440000.caffemodel"
+protoFile = args.protoFile
+weightsFile = args.weightsFile
 nPoints = 18
 # COCO Output Format
 keypointsMapping = ['Nose', 'Neck', 'R-Sho', 'R-Elb', 'R-Wr', 'L-Sho', 'L-Elb', 'L-Wr', 'R-Hip', 'R-Knee', 'R-Ank', 'L-Hip', 'L-Knee', 'L-Ank', 'R-Eye', 'L-Eye', 'R-Ear', 'L-Ear']

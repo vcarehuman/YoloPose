@@ -217,7 +217,7 @@ frameClone = image1.copy()
 for i in range(nPoints):
     for j in range(len(detected_keypoints[i])):
         cv2.circle(frameClone, detected_keypoints[i][j][0:2], 5, colors[i], -1, cv2.LINE_AA)
-cv2.imshow("Keypoints",frameClone)
+
 
 valid_pairs, invalid_pairs = getValidPairs(output)
 personwiseKeypoints = getPersonwiseKeypoints(valid_pairs, invalid_pairs)
@@ -232,5 +232,4 @@ for i in range(17):
         cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
 
 
-cv2.imshow("Detected Pose" , frameClone)
-cv2.waitKey(0)
+cv2.imwrite("posepredictions.jpg",frameClone)

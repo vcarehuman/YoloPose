@@ -217,6 +217,7 @@ frameClone = image1.copy()
 for i in range(nPoints):
     for j in range(len(detected_keypoints[i])):
         cv2.circle(frameClone, detected_keypoints[i][j][0:2], 5, colors[i], -1, cv2.LINE_AA)
+        cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 2, cv2.LINE_AA)
 
 
 valid_pairs, invalid_pairs = getValidPairs(output)

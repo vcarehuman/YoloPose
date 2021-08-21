@@ -18,7 +18,7 @@ class Predictor:
         with open('config/config.yaml') as cfg:
             config = yaml.load(cfg)
         model = get_generator(model_name or config['model'])
-        model.load_state_dict(torch.load(weights_path)['model'])
+        model.load_state_dict(torch.load('/mydrive/yolov3//fpn_inception.h5')['model'])
         self.model = model.cuda()
         self.model.train(True)
         # GAN inference should be in train mode to use actual stats in norm layers,
@@ -90,8 +90,8 @@ def process_video(pairs, predictor, output_dir):
 
 def main(img_pattern: str,
          mask_pattern: Optional[str] = None,
-         weights_path='/content/Colab-DeblurGANv2/models/fpn_inception.h5',
-         out_dir='submit/',
+         weights_path='/mydrive/yolov3//fpn_inception.h5',
+         out_dir='/',
          side_by_side: bool = False,
          video: bool = False):
     def sorted_glob(pattern):

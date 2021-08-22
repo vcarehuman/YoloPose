@@ -18,7 +18,7 @@ class Predictor:
         with open('config/config.yaml') as cfg:
             config = yaml.load(cfg)
         model = get_generator(model_name or config['model'])
-        model.load_state_dict(torch.load('/mydrive/yolov3//fpn_inception.h5')['model'])
+        model.load_state_dict(torch.load('fpn_inception.h5')['model'])
         self.model = model.cuda()
         self.model.train(True)
         # GAN inference should be in train mode to use actual stats in norm layers,
@@ -90,8 +90,8 @@ def process_video(pairs, predictor, output_dir):
 
 def main(img_pattern: str,
          mask_pattern: Optional[str] = None,
-         weights_path='/mydrive/yolov3//fpn_inception.h5',
-         out_dir='/',
+         weights_path='fpn_inception.h5',
+         out_dir='/mydrive/images/test/resultsUnBlur/',
          side_by_side: bool = False,
          video: bool = False):
     def sorted_glob(pattern):
@@ -114,6 +114,7 @@ def main(img_pattern: str,
             if side_by_side:
                 pred = np.hstack((img, pred))
             pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
+            print("writing file at ",out_dir, name)
             cv2.imwrite(os.path.join(out_dir, name),
                         pred)
     else:

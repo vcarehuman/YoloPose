@@ -224,11 +224,8 @@ def main():
         darknet.print_detections(detections, args.ext_output)
         fps = int(1/(time.time() - prev_time))
         print("FPS2: {}".format(fps))
-        cv2_imwrite(image)
-        if not args.dont_show:
-            # creating a object 
-           cv2_imwrite(image)
-           
+        cv2.imwrite("result.jpg",image)
+              
         index += 1
 
 

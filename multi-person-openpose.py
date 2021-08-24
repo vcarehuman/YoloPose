@@ -216,8 +216,14 @@ for part in range(nPoints):
 frameClone = image1.copy()
 for i in range(nPoints):
     for j in range(len(detected_keypoints[i])):
-        cv2.circle(frameClone, detected_keypoints[i][j][0:2], 5, colors[i], -1, cv2.LINE_AA)
-        cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 2, cv2.LINE_AA)
+        if "Wr" in keypointsMapping[i]:
+        #cv2.circle(frameClone, detected_keypoints[i][j][0:2], 2, colors[i], -1, cv2.LINE_AA)
+          cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 1, cv2.LINE_AA)
+          point = detected_keypoints[i][j][0:2]
+          x = int(point[0])
+          y = int(point[1])
+          print("point x={} y ={}",point[0],point[1])
+          cv2.rectangle(frameClone, (x - 50, y - 50), (x + 50, y + 50), (255,0,0), 1)
 
 
 valid_pairs, invalid_pairs = getValidPairs(output)
@@ -230,7 +236,7 @@ for i in range(17):
             continue
         B = np.int32(keypoints_list[index.astype(int), 0])
         A = np.int32(keypoints_list[index.astype(int), 1])
-        cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
+        #cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
 
 
 cv2.imwrite("posepredictions.jpg",frameClone)

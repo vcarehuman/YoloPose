@@ -213,18 +213,48 @@ for part in range(nPoints):
     detected_keypoints.append(keypoints_with_id)
 
 
+
 frameClone = image1.copy()
+RElbowPoint = 0
+RWR = 0
+LElbow = 0
+LWR = 0
+gray = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
+blurred = cv2.GaussianBlur(image1, (5, 5), 0)
+canny = cv2.Canny(gray, 100, 200)
+(cnts, _) = cv2.findContours(canny.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+cv2.drawContours(frameClone,cnts, -1, (255, 0, 0), 1)
+
+
 for i in range(nPoints):
     for j in range(len(detected_keypoints[i])):
-        if "Wr" in keypointsMapping[i]:
+        if "R-Elb" in keypointsMapping[i] :
         #cv2.circle(frameClone, detected_keypoints[i][j][0:2], 2, colors[i], -1, cv2.LINE_AA)
           cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 1, cv2.LINE_AA)
-          point = detected_keypoints[i][j][0:2]
-          x = int(point[0])
-          y = int(point[1])
-          print("point x={} y ={}",point[0],point[1])
-          cv2.rectangle(frameClone, (x - 50, y - 50), (x + 50, y + 50), (255,0,0), 1)
+          RElbowPoint = detected_keypoints[i][j][0:2]
+        if "R-Wr" in keypointsMapping[i] :
+        #cv2.circle(frameClone, detected_keypoints[i][j][0:2], 2, colors[i], -1, cv2.LINE_AA)
+          cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 1, cv2.LINE_AA)
+          RWR = detected_keypoints[i][j][0:2]
+        if "L-Elb" in keypointsMapping[i] :
+        #cv2.circle(frameClone, detected_keypoints[i][j][0:2], 2, colors[i], -1, cv2.LINE_AA)
+          cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 1, cv2.LINE_AA)
+          LElbow = detected_keypoints[i][j][0:2]
+        if "L-Wr" in keypointsMapping[i] :
+        #cv2.circle(frameClone, detected_keypoints[i][j][0:2], 2, colors[i], -1, cv2.LINE_AA)
+          cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 1, cv2.LINE_AA)
+          LWR = detected_keypoints[i][j][0:2]
+          #x = int(point[0])
+          #y = int(point[1])
+          #print("point x={} y ={}",point[0],point[1])
+        #cv2.rectangle(frameClone, (x - 50, y - 50), (x + 50, y + 50), (255,0,0), 1)
 
+for cnt in cnts:
+    x,y,w,h = cv2.boundingRect(cnt)
+    if RWR != 0 and RWR[0] >= x and RWR[0] <=x+w and RWR[1] >= y and RWR[1] <=y+h: 
+      cv2.rectangle(frameClone,(x,y),(x+w,y+h),(0,255,0),1)
+    if LWR != 0 and LWR[0] >= x and LWR[0] <=x+w and LWR[1] >= y and LWR[1] <=y+h: 
+      cv2.rectangle(frameClone,(x,y),(x+w,y+h),(0,255,0),1)
 
 valid_pairs, invalid_pairs = getValidPairs(output)
 personwiseKeypoints = getPersonwiseKeypoints(valid_pairs, invalid_pairs)

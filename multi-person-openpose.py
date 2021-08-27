@@ -5,7 +5,7 @@ from random import randint
 import argparse
 
 parser = argparse.ArgumentParser(description='Run keypoint detection')
-parser.add_argument("--device", default="cpu", help="Device to inference on")
+parser.add_argument("--device", default="gpu", help="Device to inference on")
 parser.add_argument("--image_file", default="group.jpg", help="Input image")
 parser.add_argument("--protoFile", default="group.jpg", help="Input image")
 parser.add_argument("--weightsFile", default="group.jpg", help="Input image")

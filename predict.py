@@ -123,7 +123,7 @@ def main(img_pattern: str,
 def unblur(img_pattern: str,
          mask_pattern: Optional[str] = None,
          weights_path='fpn_inception.h5',
-         out_dir='/mydrive/images/test/resultsUnBlur/',
+         out_dir='/mydrive/images/UnBlurredPredictions/',
          side_by_side: bool = False,
          video: bool = False):
     def sorted_glob(pattern):

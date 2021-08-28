@@ -3,6 +3,7 @@ import time
 import numpy as np
 from random import randint
 import argparse
+from predict import *
 
 parser = argparse.ArgumentParser(description='Run keypoint detection')
 parser.add_argument("--device", default="gpu", help="Device to inference on")
@@ -169,6 +170,11 @@ def getPersonwiseKeypoints(valid_pairs, invalid_pairs):
                     personwiseKeypoints = np.vstack([personwiseKeypoints, row])
     return personwiseKeypoints
 
+def vconcat_resize_min(im_list, interpolation=cv2.INTER_CUBIC):
+    w_min = min(im.shape[1] for im in im_list)
+    im_list_resize = [cv2.resize(im, (w_min, int(im.shape[0] * w_min / im.shape[1])), interpolation=interpolation)
+                      for im in im_list]
+    return cv2.vconcat(im_list_resize)
 
 frameWidth = image1.shape[1]
 frameHeight = image1.shape[0]
@@ -219,42 +225,53 @@ RElbowPoint = 0
 RWR = 0
 LElbow = 0
 LWR = 0
-gray = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
-blurred = cv2.GaussianBlur(image1, (5, 5), 0)
-canny = cv2.Canny(gray, 100, 200)
-(cnts, _) = cv2.findContours(canny.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-cv2.drawContours(frameClone,cnts, -1, (255, 0, 0), 1)
+croppedImages = []
 
 
 for i in range(nPoints):
     for j in range(len(detected_keypoints[i])):
         if "R-Elb" in keypointsMapping[i] :
-        #cv2.circle(frameClone, detected_keypoints[i][j][0:2], 2, colors[i], -1, cv2.LINE_AA)
-          cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 1, cv2.LINE_AA)
           RElbowPoint = detected_keypoints[i][j][0:2]
         if "R-Wr" in keypointsMapping[i] :
-        #cv2.circle(frameClone, detected_keypoints[i][j][0:2], 2, colors[i], -1, cv2.LINE_AA)
-          cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 1, cv2.LINE_AA)
           RWR = detected_keypoints[i][j][0:2]
+
+          RELBX =int(RElbowPoint[0]) 
+          RELBY =int(RElbowPoint[1])
+          x = int(RWR[0])
+          y = int(RWR[1])
+          print ("R-Elb {} RWR {}",RElbowPoint,RWR)
+          if RELBX is None:
+            croppedImage = frameClone[y-75:y+75 , x-50:x+50]
+          elif RELBX < x :
+            croppedImage = frameClone[y-75:y+75 , x -75 : x+75]
+          elif RELBX > x :
+            croppedImage = frameClone[y-75:y+75, x-75:x+75]
+          elif RELBX == x :
+            croppedImage = frameClone[y-75:y+75 , x-50:x+50]
+
+          croppedImages.append(croppedImage)
         if "L-Elb" in keypointsMapping[i] :
-        #cv2.circle(frameClone, detected_keypoints[i][j][0:2], 2, colors[i], -1, cv2.LINE_AA)
-          cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 1, cv2.LINE_AA)
           LElbow = detected_keypoints[i][j][0:2]
         if "L-Wr" in keypointsMapping[i] :
-        #cv2.circle(frameClone, detected_keypoints[i][j][0:2], 2, colors[i], -1, cv2.LINE_AA)
-          cv2.putText(frameClone,keypointsMapping[i],detected_keypoints[i][j][0:2], cv2.FONT_HERSHEY_SIMPLEX, 0.5, colors[i], 1, cv2.LINE_AA)
           LWR = detected_keypoints[i][j][0:2]
-          #x = int(point[0])
-          #y = int(point[1])
-          #print("point x={} y ={}",point[0],point[1])
-        #cv2.rectangle(frameClone, (x - 50, y - 50), (x + 50, y + 50), (255,0,0), 1)
+          
+          LELBX =int(LElbow[0]) 
+          LELBY =int(LElbow[1])
+          x = int(LWR[0])
+          y = int(LWR[1])
 
-for cnt in cnts:
-    x,y,w,h = cv2.boundingRect(cnt)
-    if RWR != 0 and RWR[0] >= x and RWR[0] <=x+w and RWR[1] >= y and RWR[1] <=y+h: 
-      cv2.rectangle(frameClone,(x,y),(x+w,y+h),(0,255,0),1)
-    if LWR != 0 and LWR[0] >= x and LWR[0] <=x+w and LWR[1] >= y and LWR[1] <=y+h: 
-      cv2.rectangle(frameClone,(x,y),(x+w,y+h),(0,255,0),1)
+          print ("L-Elb {} LWR {}",LElbow,LWR)
+          if LELBX is None:
+            croppedImage = frameClone[y-75:y+75 , x-50:x+50]
+          elif LELBX < x :
+            croppedImage = frameClone[y-75:y+75 , x-75:x+75]
+          elif LELBX > x :
+            croppedImage = frameClone[y-75:y+75, x-75:x+75]
+          elif LELBX == x :
+            croppedImage = frameClone[y-75:y+75, x-50:x+50]
+
+          
+          croppedImages.append(croppedImage)
 
 valid_pairs, invalid_pairs = getValidPairs(output)
 personwiseKeypoints = getPersonwiseKeypoints(valid_pairs, invalid_pairs)
@@ -266,7 +283,21 @@ for i in range(17):
             continue
         B = np.int32(keypoints_list[index.astype(int), 0])
         A = np.int32(keypoints_list[index.astype(int), 1])
-        #cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
+        
+
+im_v_resize = vconcat_resize_min(croppedImages)
+
+width = int(im_v_resize.shape[1] * 2)
+height = int(im_v_resize.shape[0] * 2)
+
+dim = (width, height)
+
+resized = cv2.resize(im_v_resize, dim, interpolation = cv2.INTER_AREA)
+
+cv2.imwrite('posepredictions.jpg', resized)
+cv2.imwrite('posepredictionsunblurred.jpg', resized)
+unblur('posepredictionsunblurred.jpg')
 
 
-cv2.imwrite("posepredictions.jpg",frameClone)
+
+#cv2.imwrite("posepredictions.jpg",frameClone)

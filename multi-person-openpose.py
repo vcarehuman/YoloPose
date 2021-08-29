@@ -4,10 +4,12 @@ import numpy as np
 from random import randint
 import argparse
 from predict import *
+import glob
 
 parser = argparse.ArgumentParser(description='Run keypoint detection')
 parser.add_argument("--device", default="gpu", help="Device to inference on")
 parser.add_argument("--image_file", default="group.jpg", help="Input image")
+parser.add_argument("--image_folder",  help="Input folder")
 parser.add_argument("--video_file",  help="Input video")
 parser.add_argument("--protoFile", default="group.jpg", help="Input image")
 parser.add_argument("--weightsFile", default="group.jpg", help="Input image")
@@ -187,7 +189,15 @@ def processVideo():
         processImage(frame)
     cap.release()
 
-def processImage(image1):
+def load_images_from_folder(folder):
+    images = []
+    for filename in os.listdir(folder):
+        img = cv2.imread(os.path.join(folder,filename))
+        if img is not None:
+            images.append(img)
+    return images
+
+def processImage(image1,filename,predictor):
     #image1 = cv2.imread(args.image_file)
     frameWidth = image1.shape[1]
     frameHeight = image1.shape[0]
@@ -248,9 +258,9 @@ def processImage(image1):
               RElbowPoint = detected_keypoints[i][j][0:2]
             if "R-Wr" in keypointsMapping[i] :
               RWR = detected_keypoints[i][j][0:2]
-
-              RELBX =int(RElbowPoint[0]) 
-              RELBY =int(RElbowPoint[1])
+              print(RElbowPoint)
+              RELBX =  int(RElbowPoint[0]) if RElbowPoint != 0 else int(RWR[0])  
+              RELBY =  int(RElbowPoint[1]) if RElbowPoint != 0 else int(RWR[1])  
               x = int(RWR[0])
               y = int(RWR[1])
               print ("R-Elb {} RWR {}",RElbowPoint,RWR)
@@ -268,9 +278,9 @@ def processImage(image1):
               height = int(croppedImage.shape[0] * 2)
               dim = (width, height)
               resized = cv2.resize(croppedImage, dim, interpolation = cv2.INTER_AREA)
-              imgname = "predictions" + str(counter) +".jpg";
+              imgname = filename.rsplit( ".", 1 )[ 0 ] + "_" + str(counter)+".jpg";
               cv2.imwrite(imgname, resized)
-              unblur(imgname)
+              unblur(imgname,predictor)
               counter = counter + 1
 
             if "L-Elb" in keypointsMapping[i] :
@@ -278,8 +288,8 @@ def processImage(image1):
             if "L-Wr" in keypointsMapping[i] :
               LWR = detected_keypoints[i][j][0:2]
               
-              LELBX =int(LElbow[0]) 
-              LELBY =int(LElbow[1])
+              LELBX =  int(LElbow[0]) if LElbow != 0 else int(LWR[0])  
+              LELBY =  int(LElbow[1]) if LElbow != 0 else int(LWR[1])  
               x = int(LWR[0])
               y = int(LWR[1])
 
@@ -299,10 +309,14 @@ def processImage(image1):
               height = int(croppedImage.shape[0] * 2)
               dim = (width, height)
               resized = cv2.resize(croppedImage, dim, interpolation = cv2.INTER_AREA)
-              imgname = "predictions" + str(counter)+".jpg";
+              imgname = filename.rsplit( ".", 1 )[ 0 ] + "_" + str(counter)+".jpg";
               cv2.imwrite(imgname, resized)
-              unblur(imgname)
+              unblur(imgname,predictor)
               counter = counter + 1
 
-image1 = cv2.imread(args.image_file)
-processImage(image1)
+#image1 = cv2.imread(args.image_folder)
+predictor = Predictor(weights_path='fpn_inception.h5')
+print(predictor)
+for filename in os.listdir(args.image_folder):
+    img = cv2.imread(os.path.join(args.image_folder,filename))
+    processImage(img,filename,predictor)

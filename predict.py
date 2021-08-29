@@ -18,6 +18,7 @@ class Predictor:
         with open('config/config.yaml') as cfg:
             config = yaml.load(cfg)
         model = get_generator(model_name or config['model'])
+        print("loadng model")
         model.load_state_dict(torch.load('fpn_inception.h5')['model'])
         self.model = model.cuda()
         self.model.train(True)
@@ -120,7 +121,7 @@ def main(img_pattern: str,
     else:
         process_video(pairs, predictor, out_dir)
 
-def unblur(img_pattern: str,
+def unblur(img_pattern: str, predictor,
          mask_pattern: Optional[str] = None,
          weights_path='fpn_inception.h5',
          out_dir='/mydrive/images/UnBlurredPredictions/',
@@ -133,7 +134,7 @@ def unblur(img_pattern: str,
     masks = sorted_glob(mask_pattern) if mask_pattern is not None else [None for _ in imgs]
     pairs = zip(imgs, masks)
     names = sorted([os.path.basename(x) for x in glob(img_pattern)])
-    predictor = Predictor(weights_path=weights_path)
+    
 
     os.makedirs(out_dir, exist_ok=True)
     if not video:

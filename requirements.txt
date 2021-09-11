@@ -11,4 +11,6 @@ tqdm
 glog
 tensorboardx
 fire
+xmltodict
+Pillow
 # this file is not ready yet

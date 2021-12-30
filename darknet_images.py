@@ -191,6 +191,44 @@ def batch_detection_example():
         cv2.imwrite(name.replace("data/", ""), image)
     print(detections)
 
+network = "" 
+class_names = "" 
+class_colors = ""
+
+def loadYoloModel():
+    network, class_names, class_colors = darknet.load_network(
+        "/mydrive/yolov3/yolov3_final.cfg",
+        "/mydrive/yolov3/obj.data",
+        "/mydrive/yolov3/yolov3_final_last.weights",
+        1
+    )
+
+def yoloTest(fileName,thresh):
+    images = load_images(fileName)
+
+    index = 0
+    while True:
+        # loop asking for new image paths if no list is given
+        if fileName:
+            if index >= len(images):
+                break
+            image_name = images[index]
+        else:
+            image_name = input("Enter Image Path: ")
+        prev_time = time.time()
+        image, detections = image_detection(
+            image_name, network, class_names, class_colors, thresh
+            )
+        
+        save_annotations(image_name, image, detections, class_names)
+        darknet.print_detections(detections, 'store_true')
+        fps = int(1/(time.time() - prev_time))
+        print("FPS2: {}".format(fps))
+        newfileName = fileName.split(".")[0]+"_yolo.jpg"
+        cv2.imwrite(newfileName,image)
+              
+        index += 1
+
 
 def main():
     args = parser()

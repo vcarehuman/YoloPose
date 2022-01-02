@@ -262,7 +262,7 @@ def main():
         darknet.print_detections(detections, args.ext_output)
         fps = int(1/(time.time() - prev_time))
         print("FPS2: {}".format(fps))
-        cv2.imwrite("result.jpg",image)
+        cv2.imwrite(image_name.split(".")[0]+"_yolo.jpg",image)
               
         index += 1
 

@@ -123,7 +123,6 @@ def main(img_pattern: str,
 
 def unblur(img_pattern: str, predictor,
          mask_pattern: Optional[str] = None,
-         weights_path='fpn_inception.h5',
          out_dir='/mydrive/images/UnBlurredPredictions/',
          side_by_side: bool = False,
          video: bool = False):
@@ -147,8 +146,8 @@ def unblur(img_pattern: str, predictor,
             if side_by_side:
                 pred = np.hstack((img, pred))
             pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
-            print("writing file at ",out_dir, name)
-            cv2.imwrite(os.path.join(out_dir, name),
+            print("writing file at ",out_dir, name.split(".")[0]+"_finalUnblurred.jpg")
+            cv2.imwrite(os.path.join(out_dir, name.split(".")[0]+"_finalUnblurred.jpg"),
                         pred)
     else:
         process_video(pairs, predictor, out_dir)

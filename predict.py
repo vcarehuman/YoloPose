@@ -89,10 +89,10 @@ def process_video(pairs, predictor, output_dir):
             pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
             video_out.write(pred)
 
-def main(img_pattern: str,
+def main(img_pattern: str, predictor: Predictor,
          mask_pattern: Optional[str] = None,
          weights_path='fpn_inception.h5',
-         out_dir='/mydrive/images/test/resultsUnBlur/',
+         out_dir='/content/gdrive/MyDrive/videos/frames/',
          side_by_side: bool = False,
          video: bool = False):
     def sorted_glob(pattern):
@@ -102,7 +102,7 @@ def main(img_pattern: str,
     masks = sorted_glob(mask_pattern) if mask_pattern is not None else [None for _ in imgs]
     pairs = zip(imgs, masks)
     names = sorted([os.path.basename(x) for x in glob(img_pattern)])
-    predictor = Predictor(weights_path=weights_path)
+    #predictor = Predictor(weights_path=weights_path)
 
     os.makedirs(out_dir, exist_ok=True)
     if not video:
@@ -110,20 +110,19 @@ def main(img_pattern: str,
             f_img, f_mask = pair
             img, mask = map(cv2.imread, (f_img, f_mask))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
             pred = predictor(img, mask)
             if side_by_side:
                 pred = np.hstack((img, pred))
             pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
-            print("writing file at ",out_dir, name)
-            cv2.imwrite(os.path.join(out_dir, name),
-                        pred)
+            newfilename = name.split('.')[0]+'_unblurred.jpg'
+            print("writing file at ",out_dir,newfilename)
+            cv2.imwrite(os.path.join(out_dir,newfilename),pred)
     else:
         process_video(pairs, predictor, out_dir)
 
 def unblur(img_pattern: str, predictor,
          mask_pattern: Optional[str] = None,
-         out_dir='/mydrive/images/UnBlurredPredictions/',
+         out_dir='/content/gdrive/MyDrive/videos/frames/',
          side_by_side: bool = False,
          video: bool = False):
     def sorted_glob(pattern):
@@ -146,8 +145,8 @@ def unblur(img_pattern: str, predictor,
             if side_by_side:
                 pred = np.hstack((img, pred))
             pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
-            print("writing file at ",out_dir, name.split(".")[0]+"_finalUnblurred.jpg")
-            cv2.imwrite(os.path.join(out_dir, name.split(".")[0]+"_finalUnblurred.jpg"),
+            print("writing file at ",out_dir, name.split(".")[0]+"_unblurred.jpg")
+            cv2.imwrite(os.path.join(out_dir, name.split(".")[0]+"_unblurred.jpg"),
                         pred)
     else:
         process_video(pairs, predictor, out_dir)

@@ -15,10 +15,7 @@ parser.add_argument("--thr", default=0.2, type=float, help="confidence threshold
 
 args = parser.parse_args()
 
-
-
 image1 = cv2.imread(args.image_file)
-
 
 protoFile = args.protoFile
 weightsFile = args.weightsFile
@@ -55,7 +52,7 @@ frame_copy2 = image1.copy()
 cols = frame_resized.shape[1] 
 rows = frame_resized.shape[0]
 
-
+personList = [] 
 opacity = 0.3
 cv2.addWeighted(frame_copy, opacity, image1, 1 - opacity, 0, image1)
 
@@ -74,17 +71,10 @@ for i in range(detections.shape[2]):
         yLeftBottom_ = int(heightFactor* yLeftBottom)
         xRightTop_   = int(widthFactor * xRightTop)
         yRightTop_   = int(heightFactor * yRightTop)
-        cv2.rectangle(image1, (xLeftBottom_, yLeftBottom_), (xRightTop_, yRightTop_),
-          (0, 0, 0),2)
-        # Draw label and confidence of prediction in frame resized
-        if class_id in classNames:
-            label = classNames[class_id] + ": " + str(confidence)
-            #labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_TRIPLEX, 0.8, 1)
-
-            
-            cv2.rectangle(image1, (xLeftBottom_, yLeftBottom_ ),
-                                 (xLeftBottom_ , yLeftBottom_ ),
-                                 (0, 0, 0), cv2.FILLED)
+        cv2.rectangle(image1, (xLeftBottom_, yLeftBottom_), (xRightTop_, yRightTop_),(0,0,255))
+        person = [xLeftBottom_, yLeftBottom_ ,xLeftBottom_ , yLeftBottom_]
+        personList.append(person)
+        
             
 POSE_PAIRS = [[1,2], [1,5], [2,3], [3,4], [5,6], [6,7],
               [1,8], [8,9], [9,10], [1,11], [11,12], [12,13],
@@ -289,10 +279,20 @@ for i in range(17):
     for n in range(len(personwiseKeypoints)):
         index = personwiseKeypoints[n][np.array(POSE_PAIRS[i])]
         if -1 in index:
-            continue
+            if keypointsMapping[POSE_PAIRS[i][0]] == "R-Elb" or keypointsMapping[POSE_PAIRS[i][0]] == "R-Wr" or keypointsMapping[POSE_PAIRS[i][0]] == "L-Elb" or keypointsMapping[POSE_PAIRS[i][0]] == "L-Wr" or keypointsMapping[POSE_PAIRS[i][1]] == "R-Elb" or keypointsMapping[POSE_PAIRS[i][1]] == "R-Wr" or keypointsMapping[POSE_PAIRS[i][1]] == "L-Elb" or keypointsMapping[POSE_PAIRS[i][1]] == "L-Wr":
+                print(keypointsMapping[POSE_PAIRS[i][0]],keypointsMapping[POSE_PAIRS[i][1]])
+                print("keypoints_list[i,0])", keypoints_list[i,0])
+                print("keypoints_list[i,1])", keypoints_list[i,1])
+                
+                #for p in range(len(personList)):
+                    #if 
+                    #croppedImage = frameClone[y-75:y+75 , x-50:x+50]
+            else:
+                continue
         B = np.int32(keypoints_list[index.astype(int), 0])
         A = np.int32(keypoints_list[index.astype(int), 1])
         print("B[0],A[0] = ",B[0],A[0]," B[1],A[1] =",B[1],A[1],  "Index ",keypointsMapping[POSE_PAIRS[i][0]],keypointsMapping[POSE_PAIRS[i][1]])
+        
         cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
 
 

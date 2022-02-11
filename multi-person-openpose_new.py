@@ -4,12 +4,14 @@ import numpy as np
 from random import randint
 import argparse
 from google.colab.patches import cv2_imshow
+import imutils
 
 parser = argparse.ArgumentParser(description='Run keypoint detection')
 parser.add_argument("--device", default="gpu", help="Device to inference on")
 parser.add_argument("--image_file", default="group.jpg", help="Input image")
 parser.add_argument("--protoFile", default="group.jpg", help="Input image")
 parser.add_argument("--weightsFile", default="group.jpg", help="Input image")
+parser.add_argument("--thr", default=0.2, type=float, help="confidence threshold to filter out weak detections")
 
 args = parser.parse_args()
 
@@ -17,12 +19,73 @@ args = parser.parse_args()
 
 image1 = cv2.imread(args.image_file)
 
+
 protoFile = args.protoFile
 weightsFile = args.weightsFile
 nPoints = 18
 # COCO Output Format
 keypointsMapping = ['Nose', 'Neck', 'R-Sho', 'R-Elb', 'R-Wr', 'L-Sho', 'L-Elb', 'L-Wr', 'R-Hip', 'R-Knee', 'R-Ank', 'L-Hip', 'L-Knee', 'L-Ank', 'R-Eye', 'L-Eye', 'R-Ear', 'L-Ear']
 
+
+# Labels of Network.
+classNames = { 15: 'person'}
+
+#Load the Caffe model 
+net = cv2.dnn.readNetFromCaffe("/content/gdrive/MyDrive/MobileNetSSDModel/MobileNetSSD_deploy.prototxt", "/content/gdrive/MyDrive/MobileNetSSDModel/MobileNetSSD_deploy.caffemodel")
+# Load image fro
+
+frame_resized = cv2.resize(image1,(300,300)) # resize frame for prediction
+heightFactor = image1.shape[0]/300.0
+widthFactor = image1.shape[1]/300.0 
+# MobileNet requires fixed dimensions for input image(s)
+# so we have to ensure that it is resized to 300x300 pixels.
+# set a scale factor to image because network the objects has differents size. 
+# We perform a mean subtraction (127.5, 127.5, 127.5) to normalize the input;
+# after executing this command our "blob" now has the shape:
+# (1, 3, 300, 300)
+blob = cv2.dnn.blobFromImage(frame_resized, 0.007843, (300, 300), (127.5, 127.5, 127.5), False)
+#Set to network the input blob 
+net.setInput(blob)
+#Prediction of network
+detections = net.forward()
+
+frame_copy = image1.copy()
+frame_copy2 = image1.copy()
+#Size of frame resize (300x300)
+cols = frame_resized.shape[1] 
+rows = frame_resized.shape[0]
+
+
+opacity = 0.3
+cv2.addWeighted(frame_copy, opacity, image1, 1 - opacity, 0, image1)
+
+for i in range(detections.shape[2]):
+    confidence = detections[0, 0, i, 2] #Confidence of prediction 
+    if confidence > args.thr: # Filter prediction 
+        class_id = int(detections[0, 0, i, 1]) # Class label
+
+        # Object location 
+        xLeftBottom = int(detections[0, 0, i, 3] * cols) 
+        yLeftBottom = int(detections[0, 0, i, 4] * rows)
+        xRightTop   = int(detections[0, 0, i, 5] * cols)
+        yRightTop   = int(detections[0, 0, i, 6] * rows)
+
+        xLeftBottom_ = int(widthFactor * xLeftBottom) 
+        yLeftBottom_ = int(heightFactor* yLeftBottom)
+        xRightTop_   = int(widthFactor * xRightTop)
+        yRightTop_   = int(heightFactor * yRightTop)
+        cv2.rectangle(image1, (xLeftBottom_, yLeftBottom_), (xRightTop_, yRightTop_),
+          (0, 0, 0),2)
+        # Draw label and confidence of prediction in frame resized
+        if class_id in classNames:
+            label = classNames[class_id] + ": " + str(confidence)
+            #labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_TRIPLEX, 0.8, 1)
+
+            
+            cv2.rectangle(image1, (xLeftBottom_, yLeftBottom_ ),
+                                 (xLeftBottom_ , yLeftBottom_ ),
+                                 (0, 0, 0), cv2.FILLED)
+            
 POSE_PAIRS = [[1,2], [1,5], [2,3], [3,4], [5,6], [6,7],
               [1,8], [8,9], [9,10], [1,11], [11,12], [12,13],
               [1,0], [0,14], [14,16], [0,15], [15,17],
@@ -222,60 +285,16 @@ for i in range(nPoints):
 
 valid_pairs, invalid_pairs = getValidPairs(output)
 personwiseKeypoints = getPersonwiseKeypoints(valid_pairs, invalid_pairs)
-
-#for i in range(17):
-for n in range(len(personwiseKeypoints)):
-
-    Person = personwiseKeypoints
-    R_WR = personwiseKeypoints[n][4]
-    R_ELB = personwiseKeypoints[n][5]
-    L_ELB_WR = personwiseKeypoints[n][np.array(POSE_PAIRS[5])]
-    print("Person",Person)
-    print("R_WR",keypoints_list[R_WR.astype(int), 0])
-    print("R_ELB",keypoints_list[R_ELB.astype(int), 0])
-    print("L_ELB_WR",keypoints_list[L_ELB_WR.astype(int), 0])
-    
-    print("Next")
+for i in range(17):
+    for n in range(len(personwiseKeypoints)):
+        index = personwiseKeypoints[n][np.array(POSE_PAIRS[i])]
+        if -1 in index:
+            continue
+        B = np.int32(keypoints_list[index.astype(int), 0])
+        A = np.int32(keypoints_list[index.astype(int), 1])
+        print("B[0],A[0] = ",B[0],A[0]," B[1],A[1] =",B[1],A[1],  "Index ",keypointsMapping[POSE_PAIRS[i][0]],keypointsMapping[POSE_PAIRS[i][1]])
+        cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
 
 
-#     R_ELBX  = keypoints_list[R_ELB.astype(int), 0][0]
-#     R_ELBY  = keypoints_list[R_ELB.astype(int), 1][0]
-    
-#     R_WRX  = keypoints_list[R_WR.astype(int), 0][0] 
-#     R_WRY  = keypoints_list[R_WR.astype(int), 1][0]
-
-#     L_ELBX  = keypoints_list[L_ELB.astype(int), 0][0] 
-#     L_ELBY  = keypoints_list[L_ELB.astype(int), 1][0]
-
-#     L_WRX  = keypoints_list[L_WR.astype(int), 0][0] 
-#     L_WRY  = keypoints_list[L_WR.astype(int), 1][0]
-
-#     RElbowWristDistance = ((((R_WRX - R_ELBX )**2) + ((R_WRY-R_ELBY)**2) )**0.5)
-#     LElbowWristDistance = ((((L_WRX - L_ELBX )**2) + ((L_WRY-L_ELBY)**2) )**0.5)
-
-
-#     print("RELB", R_ELBX, R_ELBY)
-#     print("RWR", R_WRX, R_WRY)
-
-#     print("LELB", L_ELBX, L_ELBY)
-#     print("LWR", L_WRX, L_WRY)
-
-#     print("RElbowWristDistance",RElbowWristDistance)
-#     print("LElbowWristDistance",LElbowWristDistance)
-
-#     ExpectedGunSizeL = LElbowWristDistance/3
-#     ExpectedGunSizeR = RElbowWristDistance/3
-#      #B = np.int32(keypoints_list[index.astype(int), 0])
-#         #A = np.int32(keypoints_list[index.astype(int), 1])
-    
-#     #if -1 in index:
-#      #   continue
-    
-#         #B = np.int32(keypoints_list[index.astype(int), 0])
-#         #A = np.int32(keypoints_list[index.astype(int), 1])
-
-#         #cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
-
-
-# #cv2.imwrite('resultspose.jpg',frameClone)
-
+cv2.imwrite("result1.jpg" , frameClone)
+#cv2.waitKey(0)

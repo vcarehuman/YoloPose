@@ -252,12 +252,17 @@ detected_keypoints = []
 keypoints_list = np.zeros((0,3))
 keypoint_id = 0
 threshold = 0.1
-
+pointsWithPartCollection = []
+pointsWithParts = []
 for part in range(nPoints):
     probMap = output[0,part,:,:]
     probMap = cv2.resize(probMap, (image1.shape[1], image1.shape[0]))
     keypoints = getKeypoints(probMap, threshold)
     print("Keypoints - {} : {}".format(keypointsMapping[part], keypoints))
+    if "Elb" in keypointsMapping[part] or "Wr" in keypointsMapping[part]:
+        pointsWithParts = [keypointsMapping[part],[keypoints[0][0],keypoints[0][1]]]
+        pointsWithPartCollection.append(pointsWithParts)
+
     keypoints_with_id = []
     for i in range(len(keypoints)):
         keypoints_with_id.append(keypoints[i] + (keypoint_id,))
@@ -273,28 +278,42 @@ for i in range(nPoints):
         cv2.circle(frameClone, detected_keypoints[i][j][0:2], 5, colors[i], -1, cv2.LINE_AA)
 #cv2.imshow("Keypoints",frameClone)
 
+
 valid_pairs, invalid_pairs = getValidPairs(output)
+print("pointsWithPartCollection",pointsWithPartCollection)
 personwiseKeypoints = getPersonwiseKeypoints(valid_pairs, invalid_pairs)
+pairWiseKeyPointsFound = []
+pairWiseKeyPointsFoundCollection = []
 for i in range(17):
     for n in range(len(personwiseKeypoints)):
         index = personwiseKeypoints[n][np.array(POSE_PAIRS[i])]
         if -1 in index:
-            if keypointsMapping[POSE_PAIRS[i][0]] == "R-Elb" or keypointsMapping[POSE_PAIRS[i][0]] == "R-Wr" or keypointsMapping[POSE_PAIRS[i][0]] == "L-Elb" or keypointsMapping[POSE_PAIRS[i][0]] == "L-Wr" or keypointsMapping[POSE_PAIRS[i][1]] == "R-Elb" or keypointsMapping[POSE_PAIRS[i][1]] == "R-Wr" or keypointsMapping[POSE_PAIRS[i][1]] == "L-Elb" or keypointsMapping[POSE_PAIRS[i][1]] == "L-Wr":
-                print(keypointsMapping[POSE_PAIRS[i][0]],keypointsMapping[POSE_PAIRS[i][1]])
-                print("keypoints_list[i,0])", keypoints_list[i,0])
-                print("keypoints_list[i,1])", keypoints_list[i,1])
-                
-                #for p in range(len(personList)):
-                    #if 
-                    #croppedImage = frameClone[y-75:y+75 , x-50:x+50]
-            else:
-                continue
+            continue
         B = np.int32(keypoints_list[index.astype(int), 0])
         A = np.int32(keypoints_list[index.astype(int), 1])
-        print("B[0],A[0] = ",B[0],A[0]," B[1],A[1] =",B[1],A[1],  "Index ",keypointsMapping[POSE_PAIRS[i][0]],keypointsMapping[POSE_PAIRS[i][1]])
+        
+
+
+        if ("Elb" in keypointsMapping[POSE_PAIRS[i][0]]) or ("Wr" in keypointsMapping[POSE_PAIRS[i][0]]):
+            pairWiseKeyPointsFound = [keypointsMapping[POSE_PAIRS[i][0]],[B[0],B[1]]]
+            pairWiseKeyPointsFoundCollection.append(pairWiseKeyPointsFound)
+        
+        if ("Elb" in keypointsMapping[POSE_PAIRS[i][1]]) or ("Wr" in keypointsMapping[POSE_PAIRS[i][1]]):
+            pairWiseKeyPointsFound = [keypointsMapping[POSE_PAIRS[i][1]],[A[0],A[1]]]
+            pairWiseKeyPointsFoundCollection.append(pairWiseKeyPointsFound)
+
+        #cropping
+        if "Elb" in keypointsMapping[POSE_PAIRS[i][0]] and "Wr" in keypointsMapping[POSE_PAIRS[i][1]]:
+            #cropping logic
+            
+        
+        
+        print("POSE_PAIRS[i]", keypointsMapping[POSE_PAIRS[i][0]],keypointsMapping[POSE_PAIRS[i][1]])
+
+        #print("B[0],A[0] = ",B[0],A[0]," B[1],A[1] =",B[1],A[1],  "Index ",keypointsMapping[POSE_PAIRS[i][0]],keypointsMapping[POSE_PAIRS[i][1]])
         
         cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
 
-
+print("pairWiseKeyPointsFoundCollection",pairWiseKeyPointsFoundCollection)
 cv2.imwrite("result1.jpg" , frameClone)
 #cv2.waitKey(0)

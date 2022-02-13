@@ -305,10 +305,10 @@ for i in range(17):
         #cropping
         if "Elb" in keypointsMapping[POSE_PAIRS[i][0]] and "Wr" in keypointsMapping[POSE_PAIRS[i][1]]:
             #cropping logic
-            
-        
-        
-        print("POSE_PAIRS[i]", keypointsMapping[POSE_PAIRS[i][0]],keypointsMapping[POSE_PAIRS[i][1]])
+            print("B",B)
+            print("A",A)
+            #croppedImage = frameClone[y-75:y+75 , x-50:x+50]
+        #print("POSE_PAIRS[i]", keypointsMapping[POSE_PAIRS[i][0]],keypointsMapping[POSE_PAIRS[i][1]])
 
         #print("B[0],A[0] = ",B[0],A[0]," B[1],A[1] =",B[1],A[1],  "Index ",keypointsMapping[POSE_PAIRS[i][0]],keypointsMapping[POSE_PAIRS[i][1]])
         

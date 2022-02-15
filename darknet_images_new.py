@@ -284,6 +284,7 @@ print("pointsWithPartCollection",pointsWithPartCollection)
 personwiseKeypoints = getPersonwiseKeypoints(valid_pairs, invalid_pairs)
 pairWiseKeyPointsFound = []
 pairWiseKeyPointsFoundCollection = []
+pointsNotFoundInPairs = []
 for i in range(17):
     for n in range(len(personwiseKeypoints)):
         index = personwiseKeypoints[n][np.array(POSE_PAIRS[i])]
@@ -292,7 +293,6 @@ for i in range(17):
         B = np.int32(keypoints_list[index.astype(int), 0])
         A = np.int32(keypoints_list[index.astype(int), 1])
         
-
 
         if ("Elb" in keypointsMapping[POSE_PAIRS[i][0]]) or ("Wr" in keypointsMapping[POSE_PAIRS[i][0]]):
             pairWiseKeyPointsFound = [keypointsMapping[POSE_PAIRS[i][0]],[B[0],A[0]]]
@@ -318,5 +318,19 @@ for i in range(17):
         #cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
 
 print("pairWiseKeyPointsFoundCollection",pairWiseKeyPointsFoundCollection)
+
+# code for finding the points not in pair
+pointFound = False
+for i in range(len(pointsWithPartCollection)):
+    for j in range(len(pairWiseKeyPointsFoundCollection)):
+        if str(pointsWithPartCollection[i][0]) == (pairWiseKeyPointsFoundCollection[j][0]):
+            if pointsWithPartCollection[i][1] == pairWiseKeyPointsFoundCollection[j][1]:
+                pointFound = True
+                break
+    if pointFound == False:
+        pointsNotFoundInPairs.append(pointsWithPartCollection[i])
+    else:
+        pointFound = False
+print("pointsNotFoundInPairs",pointsNotFoundInPairs)         
 cv2.imwrite("result1.jpg" , frameClone)
 #cv2.waitKey(0)

@@ -313,6 +313,7 @@ for i in range(17):
             x2  =  width if int(B[1]+distance) > width else int(B[1]+distance)
             print("y1,y2,x1,x2", y1,y2,x1,x2)
             croppedImage = frameClone[y1:y2,x1:x2]
+            cv2.imwrite(str(n)+"pairedCropped.jpg" , croppedImage)
             #saving logic
             
         #cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
@@ -333,8 +334,24 @@ for i in range(len(pointsWithPartCollection)):
         pointFound = False
 
 #finding the right person box for the point that are not found in pairs
-for i in range(len(personList)):
-    print(personList)
+for i in range(len(pointsNotFoundInPairs)):
+    for j in range(len(personList)):
+        if pointsNotFoundInPairs[i][1][0] > personList[j][0][0] and pointsNotFoundInPairs[i][1][0] < personList[j][1][0] and pointsNotFoundInPairs[i][1][1] > personList[j][0][1]  and pointsNotFoundInPairs[i][1][1] < personList[j][1][1]: 
+            print("pointsNotFoundInPairs",pointsNotFoundInPairs[i])
+            print("personList",personList[j])
+            print("pointsNotFoundInPairs[i][1][0] > personList[j][0][0]",pointsNotFoundInPairs[i][1][0],personList[j][0][0])
+            #print("personList[j][0][0]",personList[j][0][0])
+            print("pointsNotFoundInPairs[i][1][0] > personList[j][1][0]",pointsNotFoundInPairs[i][1][0],personList[j][1][0])
+            #print("personList[j][1][0]",personList[j][1][0])
+            print("pointsNotFoundInPairs[i][1][1] < personList[j][0][1]",pointsNotFoundInPairs[i][1][1],personList[j][0][1])
+            #print("personList[j][0][1]",personList[j][0][1])
+            print("pointsNotFoundInPairs[i][1][1] < personList[j][1][1]",pointsNotFoundInPairs[i][1][1],personList[j][1][1])
+            #print("personList[j][1][1]",personList[j][1][1]) 
+            print("----------------------------------------------") 
+            croppedImage = frameClone[personList[j][0][1]:personList[j][1][1],personList[j][0][0]:personList[j][1][0]]
+            cv2.imwrite(str(j)+"pointsCropped.jpg" , croppedImage)
+
+
 
 #print("pointsNotFoundInPairs",pointsNotFoundInPairs)         
 cv2.imwrite("result1.jpg" , frameClone)

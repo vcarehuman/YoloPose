@@ -72,8 +72,8 @@ for i in range(detections.shape[2]):
         xRightTop_   = int(widthFactor * xRightTop)
         yRightTop_   = int(heightFactor * yRightTop)
         cv2.rectangle(image1, (xLeftBottom_, yLeftBottom_), (xRightTop_, yRightTop_),(0,0,255))
-        person = [xLeftBottom_, yLeftBottom_ ,xLeftBottom_ , yLeftBottom_]
-        personList.append(person)
+        #person = [xLeftBottom_, yLeftBottom_ ,xLeftBottom_ , yLeftBottom_]
+        personList.append([[xLeftBottom_, yLeftBottom_], [xRightTop_, yRightTop_], (yLeftBottom_ -yRightTop_) * (xLeftBottom_ -xRightTop_)] )
         
             
 POSE_PAIRS = [[1,2], [1,5], [2,3], [3,4], [5,6], [6,7],
@@ -317,7 +317,7 @@ for i in range(17):
             
         #cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
 
-print("pairWiseKeyPointsFoundCollection",pairWiseKeyPointsFoundCollection)
+#print("pairWiseKeyPointsFoundCollection",pairWiseKeyPointsFoundCollection)
 
 # code for finding the points not in pair
 pointFound = False
@@ -331,6 +331,11 @@ for i in range(len(pointsWithPartCollection)):
         pointsNotFoundInPairs.append(pointsWithPartCollection[i])
     else:
         pointFound = False
-print("pointsNotFoundInPairs",pointsNotFoundInPairs)         
+
+#finding the right person box for the point that are not found in pairs
+for i in range(len(personList)):
+    print(personList)
+
+#print("pointsNotFoundInPairs",pointsNotFoundInPairs)         
 cv2.imwrite("result1.jpg" , frameClone)
 #cv2.waitKey(0)

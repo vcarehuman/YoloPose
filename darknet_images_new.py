@@ -265,10 +265,7 @@ def processImage(image1,imageName,modelForPersonDetection):
 
 
     frameClone = image1.copy()
-    #for i in range(nPoints):
-        #for j in range(len(detected_keypoints[i])):
-            #cv2.circle(frameClone, detected_keypoints[i][j][0:2], 5, colors[i], -1, cv2.LINE_AA)
-    #cv2.imshow("Keypoints",frameClone)
+    
 
     counter = 0
     valid_pairs, invalid_pairs = getValidPairs(output,frameWidth,frameHeight,detected_keypoints)
@@ -298,6 +295,7 @@ def processImage(image1,imageName,modelForPersonDetection):
             if "Elb" in keypointsMapping[POSE_PAIRS[i][0]] and "Wr" in keypointsMapping[POSE_PAIRS[i][1]]:
                 #cropping logic
                 distance = ((((B[1] - B[0] )**2) + ((A[1]-A[0])**2) )**0.5)
+                print("distance",distance)
                 height, width = frameClone.shape[:2]
                 y1  = 0 if int(A[1]-distance)  < 0 else int(A[1]-distance)  
                 y2  = height if int(A[1]+distance) > height else int(A[1]+distance) 
@@ -307,13 +305,11 @@ def processImage(image1,imageName,modelForPersonDetection):
                 croppedImage = frameClone[y1:y2,x1:x2]
                 imgname = imageName.rsplit( ".", 1 )[ 0 ] + "_" + str(counter)+".jpg";
                 print(imgname)
-                cv2.imwrite(imgname , croppedImage)
+                cv2.imwrite(args.image_folder+imgname , croppedImage)
                 counter = counter + 1
                 #saving logic
                 
-            #cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
-
-    #print("pairWiseKeyPointsFoundCollection",pairWiseKeyPointsFoundCollection)
+            
 
     # code for finding the points not in pair
     pointFound = False
@@ -360,7 +356,7 @@ def processImage(image1,imageName,modelForPersonDetection):
                 croppedImage = frameClone[y1:y2,x1:x2]
                 imgname = imageName.rsplit( ".", 1 )[ 0 ] + "_" + str(counter)+".jpg";
                 print(imgname)
-                cv2.imwrite(imgname , croppedImage)
+                cv2.imwrite(args.image_folder+imgname , croppedImage)
                 counter = counter + 1
 
 

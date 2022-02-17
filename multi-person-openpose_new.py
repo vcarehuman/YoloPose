@@ -293,19 +293,42 @@ def processImage(image1,imageName,modelForPersonDetection):
 
             #cropping
             if "Elb" in keypointsMapping[POSE_PAIRS[i][0]] and "Wr" in keypointsMapping[POSE_PAIRS[i][1]]:
-                #cropping logic
                 distance = ((((B[1] - B[0] )**2) + ((A[1]-A[0])**2) )**0.5)
-                print("distance",distance)
                 height, width = frameClone.shape[:2]
+                print("Elb", B[0],A[0])
+                print("Wr", B[1],A[1])
+                x1,x2,y1,y2 = 0,0,0,0
+                # if B[1] >= B[0]:
+                #     x1  =  B[1];
+                #     x2  =  width if int(B[1]+distance) > width else int(B[1]+distance)
+                # else:
+                #     x1  =  0 if int(B[1]-distance) < 0 else int(B[1]-distance)
+                #     x2  =  B[1]    
+
+                # if A[1] >= A[0]:
+                #     print("inside A[1] >= A[0]")
+                #     y1  =  A[1] - int(distance)
+                #     y2  =  height if A[1]+int(distance) > height else A[1]+int(distance) 
+                # else:
+                #     print("inside A[1] < A[0]")
+                #     y1  =  0 if A[1]+int(distance)  < 0 else A[1]+ int(distance)  
+                #     y2  =  A[1] + int(distance)       
+                
+                print("Wr",keypointsMapping[POSE_PAIRS[i][1]])
+                
+                print("distance",distance)
+                
                 y1  = 0 if int(A[1]-distance)  < 0 else int(A[1]-distance)  
-                y2  = height if int(A[1]+distance) > height else int(A[1]+distance) 
+                #y2  = height if int(A[1]+distance) > height else int(A[1]+distance) 
+                y2  = height
                 x1  =  0 if int(B[1]-distance) < 0 else int(B[1]-distance)
-                x2  =  width if int(B[1]+distance) > width else int(B[1]+distance)
+                #x2  =  width if int(B[1]+distance) > width else int(B[1]+distance)
+                x2  =  width 
                 print("y1,y2,x1,x2", y1,y2,x1,x2)
                 croppedImage = frameClone[y1:y2,x1:x2]
                 imgname = imageName.rsplit( ".", 1 )[ 0 ] + "_" + str(counter)+".jpg";
                 print(imgname)
-                cv2.imwrite(args.image_folder+imgname , croppedImage)
+                #cv2.imwrite(args.image_folder+imgname , croppedImage)
                 counter = counter + 1
                 #saving logic
                 
@@ -322,6 +345,7 @@ def processImage(image1,imageName,modelForPersonDetection):
         if pointFound == False:
             pointsNotFoundInPairs.append(pointsWithPartCollection[i])
         else:
+            pointsNotFoundInPairs.append(pointsWithPartCollection[i])
             pointFound = False
 
     personList = findPeople(modelForPersonDetection, image1)

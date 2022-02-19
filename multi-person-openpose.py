@@ -17,11 +17,12 @@ parser.add_argument("--thr", default=0.2, type=float, help="confidence threshold
 args = parser.parse_args()
 protoFile = args.protoFile
 weightsFile = args.weightsFile
+folder = args.image_folder
 predictor = Predictor(weights_path='/content/gdrive/MyDrive/yolov3/fpn_inception.h5')
 
 image1 = cv2.imread(args.image_file)
 scale = 1
-image1 = unblur(image1,predictor,)
+image1 = unblur(args.image_file,predictor,)
 
 nPoints = 18
 # COCO Output Format
@@ -219,10 +220,15 @@ for part in range(nPoints):
 
 
 frameClone = image1.copy()
+
+
+
+font = cv2.FONT_HERSHEY_SIMPLEX
+
 for i in range(nPoints):
     for j in range(len(detected_keypoints[i])):
         cv2.circle(frameClone, detected_keypoints[i][j][0:2], 5, colors[i], -1, cv2.LINE_AA)
-        cv2.putText(frameClone,detected_keypoints[i][j][4], detected_keypoints[i][j][0:2], font, scale, color, thickness, cv2.LINE_AA, False)
+        cv2.putText(frameClone,detected_keypoints[i][j][4], detected_keypoints[i][j][0:2], font, scale, colors[i], 2, cv2.LINE_AA, False)
 #cv2.imshow("Keypoints",frameClone)
 
 
@@ -240,5 +246,5 @@ for i in range(17):
         cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
 
 
-cv2.imshow("Detected Pose" , frameClone)
-cv2.waitKey(0)
+cv2.imwrite(args.image_folder+"experiment.jpg" , frameClone)
+

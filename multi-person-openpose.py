@@ -4,24 +4,25 @@ import numpy as np
 from random import randint
 import argparse
 from predict import *
-import glob
 
 parser = argparse.ArgumentParser(description='Run keypoint detection')
-parser.add_argument("--device", default="gpu", help="Device to inference on")
+parser.add_argument("--device", default="cpu", help="Device to inference on")
 parser.add_argument("--image_file", default="group.jpg", help="Input image")
 parser.add_argument("--image_folder",  help="Input folder")
-parser.add_argument("--video_file",  help="Input video")
 parser.add_argument("--protoFile", default="group.jpg", help="Input image")
 parser.add_argument("--weightsFile", default="group.jpg", help="Input image")
+parser.add_argument("--thr", default=0.2, type=float, help="confidence threshold to filter out weak detections")
+
 
 args = parser.parse_args()
-
-
-
-
-
 protoFile = args.protoFile
 weightsFile = args.weightsFile
+predictor = Predictor(weights_path='/content/gdrive/MyDrive/yolov3/fpn_inception.h5')
+
+image1 = cv2.imread(args.image_file)
+scale = 1
+image1 = unblur(image1,predictor,)
+
 nPoints = 18
 # COCO Output Format
 keypointsMapping = ['Nose', 'Neck', 'R-Sho', 'R-Elb', 'R-Wr', 'L-Sho', 'L-Elb', 'L-Wr', 'R-Hip', 'R-Knee', 'R-Ank', 'L-Hip', 'L-Knee', 'L-Ank', 'R-Eye', 'L-Eye', 'R-Ear', 'L-Ear']
@@ -173,150 +174,71 @@ def getPersonwiseKeypoints(valid_pairs, invalid_pairs):
                     personwiseKeypoints = np.vstack([personwiseKeypoints, row])
     return personwiseKeypoints
 
-def vconcat_resize_min(im_list, interpolation=cv2.INTER_CUBIC):
-    w_min = min(im.shape[1] for im in im_list)
-    im_list_resize = [cv2.resize(im, (w_min, int(im.shape[0] * w_min / im.shape[1])), interpolation=interpolation)
-                      for im in im_list]
-    return cv2.vconcat(im_list_resize)
+
+frameWidth = image1.shape[1]
+frameHeight = image1.shape[0]
+
+t = time.time()
+net = cv2.dnn.readNetFromCaffe(protoFile, weightsFile)
+if args.device == "cpu":
+    net.setPreferableBackend(cv2.dnn.DNN_TARGET_CPU)
+    print("Using CPU device")
+elif args.device == "gpu":
+    net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
+    print("Using GPU device")
+
+# Fix the input Height and get the width according to the Aspect Ratio
+inHeight = 368
+inWidth = int((inHeight/frameHeight)*frameWidth)
+
+inpBlob = cv2.dnn.blobFromImage(image1, 1.0 / 255, (inWidth, inHeight),
+                          (0, 0, 0), swapRB=False, crop=False)
+
+net.setInput(inpBlob)
+output = net.forward()
+print("Time Taken in forward pass = {}".format(time.time() - t))
+
+detected_keypoints = []
+keypoints_list = np.zeros((0,3))
+keypoint_id = 0
+threshold = 0.1
+
+for part in range(nPoints):
+    probMap = output[0,part,:,:]
+    probMap = cv2.resize(probMap, (image1.shape[1], image1.shape[0]))
+    keypoints = getKeypoints(probMap, threshold)
+    print("Keypoints - {} : {}".format(keypointsMapping[part], keypoints))
+    keypoints_with_id = []
+    for i in range(len(keypoints)):
+        keypoints_with_id.append(keypoints[i] + (keypoint_id,keypointsMapping[part]))
+        keypoints_list = np.vstack([keypoints_list, keypoints[i]])
+        keypoint_id += 1
+
+    detected_keypoints.append(keypoints_with_id)
 
 
-def processVideo():
-    cap = cv2.VideoCapture(input_path)
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        processImage(frame)
-    cap.release()
-
-def load_images_from_folder(folder):
-    images = []
-    for filename in os.listdir(folder):
-        img = cv2.imread(os.path.join(folder,filename))
-        if img is not None:
-            images.append(img)
-    return images
-
-def processImage(image1,filename,predictor):
-    #image1 = cv2.imread(args.image_file)
-    frameWidth = image1.shape[1]
-    frameHeight = image1.shape[0]
-
-    t = time.time()
-    net = cv2.dnn.readNetFromCaffe(protoFile, weightsFile)
-    if args.device == "cpu":
-        net.setPreferableBackend(cv2.dnn.DNN_TARGET_CPU)
-        print("Using CPU device")
-    elif args.device == "gpu":
-        net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-        net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-        print("Using GPU device")
-
-    # Fix the input Height and get the width according to the Aspect Ratio
-    inHeight = 368
-    inWidth = int((inHeight/frameHeight)*frameWidth)
-
-    inpBlob = cv2.dnn.blobFromImage(image1, 1.0 / 255, (inWidth, inHeight),
-                              (0, 0, 0), swapRB=False, crop=False)
-
-    net.setInput(inpBlob)
-    output = net.forward()
-    print("Time Taken in forward pass = {}".format(time.time() - t))
-
-    detected_keypoints = []
-    keypoints_list = np.zeros((0,3))
-    keypoint_id = 0
-    threshold = 0.1
-
-    for part in range(nPoints):
-        probMap = output[0,part,:,:]
-        probMap = cv2.resize(probMap, (image1.shape[1], image1.shape[0]))
-        keypoints = getKeypoints(probMap, threshold)
-        print("Keypoints - {} : {}".format(keypointsMapping[part], keypoints))
-        keypoints_with_id = []
-        for i in range(len(keypoints)):
-            keypoints_with_id.append(keypoints[i] + (keypoint_id,))
-            keypoints_list = np.vstack([keypoints_list, keypoints[i]])
-            keypoint_id += 1
-
-        detected_keypoints.append(keypoints_with_id)
+frameClone = image1.copy()
+for i in range(nPoints):
+    for j in range(len(detected_keypoints[i])):
+        cv2.circle(frameClone, detected_keypoints[i][j][0:2], 5, colors[i], -1, cv2.LINE_AA)
+        cv2.putText(frameClone,detected_keypoints[i][j][4], detected_keypoints[i][j][0:2], font, scale, color, thickness, cv2.LINE_AA, False)
+#cv2.imshow("Keypoints",frameClone)
 
 
 
-    frameClone = image1.copy()
-    RElbowPoint = 0
-    RWR = 0
-    LElbow = 0
-    LWR = 0
-    croppedImages = []
-    counter = 0
+valid_pairs, invalid_pairs = getValidPairs(output)
+personwiseKeypoints = getPersonwiseKeypoints(valid_pairs, invalid_pairs)
+
+for i in range(17):
+    for n in range(len(personwiseKeypoints)):
+        index = personwiseKeypoints[n][np.array(POSE_PAIRS[i])]
+        if -1 in index:
+            continue
+        B = np.int32(keypoints_list[index.astype(int), 0])
+        A = np.int32(keypoints_list[index.astype(int), 1])
+        cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
 
 
-    for i in range(nPoints):
-        for j in range(len(detected_keypoints[i])):
-            if "R-Elb" in keypointsMapping[i] :
-              RElbowPoint = detected_keypoints[i][j][0:2]
-            if "R-Wr" in keypointsMapping[i] :
-              RWR = detected_keypoints[i][j][0:2]
-              print(RElbowPoint)
-              RELBX =  int(RElbowPoint[0]) if RElbowPoint != 0 else int(RWR[0])  
-              RELBY =  int(RElbowPoint[1]) if RElbowPoint != 0 else int(RWR[1])  
-              x = int(RWR[0])
-              y = int(RWR[1])
-              print ("R-Elb {} RWR {}",RElbowPoint,RWR)
-              if RELBX is None:
-                croppedImage = frameClone[y-75:y+75 , x-50:x+50]
-              elif RELBX < x :
-                croppedImage = frameClone[y-75:y+75 , x -75 : x+75]
-              elif RELBX > x :
-                croppedImage = frameClone[y-75:y+75, x-75:x+75]
-              elif RELBX == x :
-                croppedImage = frameClone[y-75:y+75 , x-50:x+50]
-
-              #croppedImages.append(croppedImage)
-              width = int(croppedImage.shape[1] * 2)
-              height = int(croppedImage.shape[0] * 2)
-              dim = (width, height)
-              resized = cv2.resize(croppedImage, dim, interpolation = cv2.INTER_AREA)
-              imgname = filename.rsplit( ".", 1 )[ 0 ] + "_" + str(counter)+".jpg";
-              cv2.imwrite(imgname, resized)
-              unblur(imgname,predictor)
-              counter = counter + 1
-
-            if "L-Elb" in keypointsMapping[i] :
-              LElbow = detected_keypoints[i][j][0:2]
-            if "L-Wr" in keypointsMapping[i] :
-              LWR = detected_keypoints[i][j][0:2]
-              
-              LELBX =  int(LElbow[0]) if LElbow != 0 else int(LWR[0])  
-              LELBY =  int(LElbow[1]) if LElbow != 0 else int(LWR[1])  
-              x = int(LWR[0])
-              y = int(LWR[1])
-
-              print ("L-Elb {} LWR {}",LElbow,LWR)
-              if LELBX is None:
-                croppedImage = frameClone[y-75:y+75 , x-50:x+50]
-              elif LELBX < x :
-                croppedImage = frameClone[y-75:y+75 , x-75:x+75]
-              elif LELBX > x :
-                croppedImage = frameClone[y-75:y+75, x-75:x+75]
-              elif LELBX == x :
-                croppedImage = frameClone[y-75:y+75, x-50:x+50]
-
-              
-              #croppedImages.append(croppedImage)
-              width = int(croppedImage.shape[1] * 2)
-              height = int(croppedImage.shape[0] * 2)
-              dim = (width, height)
-              resized = cv2.resize(croppedImage, dim, interpolation = cv2.INTER_AREA)
-              imgname = filename.rsplit( ".", 1 )[ 0 ] + "_" + str(counter)+".jpg";
-              cv2.imwrite(imgname, resized)
-              unblur(imgname,predictor)
-              counter = counter + 1
-
-#image1 = cv2.imread(args.image_folder)
-predictor = Predictor(weights_path='fpn_inception.h5')
-print(predictor)
-for filename in os.listdir(args.image_folder):
-    img = cv2.imread(os.path.join(args.image_folder,filename))
-    processImage(img,filename,predictor)
+cv2.imshow("Detected Pose" , frameClone)
+cv2.waitKey(0)

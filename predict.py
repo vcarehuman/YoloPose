@@ -122,7 +122,7 @@ def main(img_pattern: str, predictor: Predictor,
 
 def unblur(img_pattern: str, predictor,
          mask_pattern: Optional[str] = None,
-         out_dir='/content/gdrive/MyDrive/videos/frames/',
+         out_dir = None,
          side_by_side: bool = False,
          video: bool = False):
     def sorted_glob(pattern):
@@ -134,7 +134,7 @@ def unblur(img_pattern: str, predictor,
     names = sorted([os.path.basename(x) for x in glob(img_pattern)])
     
 
-    os.makedirs(out_dir, exist_ok=True)
+    #os.makedirs(out_dir, exist_ok=True)
     if not video:
         for name, pair in tqdm(zip(names, pairs), total=len(names)):
             f_img, f_mask = pair
@@ -145,9 +145,10 @@ def unblur(img_pattern: str, predictor,
             if side_by_side:
                 pred = np.hstack((img, pred))
             pred = cv2.cvtColor(pred, cv2.COLOR_RGB2BGR)
-            print("writing file at ",out_dir, name.split(".")[0]+"_unblurred.jpg")
-            cv2.imwrite(os.path.join(out_dir, name.split(".")[0]+"_unblurred.jpg"),
-                        pred)
+            return pred
+            # print("writing file at ",out_dir, name.split(".")[0]+"_unblurred.jpg")
+            # cv2.imwrite(os.path.join(out_dir, name.split(".")[0]+"_unblurred.jpg"),
+            #             pred)
     else:
         process_video(pairs, predictor, out_dir)
 

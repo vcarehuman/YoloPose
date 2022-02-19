@@ -19,10 +19,64 @@ protoFile = args.protoFile
 weightsFile = args.weightsFile
 folder = args.image_folder
 predictor = Predictor(weights_path='/content/gdrive/MyDrive/yolov3/fpn_inception.h5')
+modelForPersonDetection = cv2.dnn.readNetFromCaffe("/content/gdrive/MyDrive/MobileNetSSDModel/MobileNetSSD_deploy.prototxt", "/content/gdrive/MyDrive/MobileNetSSDModel/MobileNetSSD_deploy.caffemodel")
+
+
+def findPeople(modelForPersonDetection,image1):
+# Load image fro
+    personList = []
+    frame_resized = cv2.resize(image1,(300,300)) # resize frame for prediction
+    heightFactor = image1.shape[0]/300.0
+    widthFactor = image1.shape[1]/300.0 
+    # MobileNet requires fixed dimensions for input image(s)
+    # so we have to ensure that it is resized to 300x300 pixels.
+    # set a scale factor to image because network the objects has differents size. 
+    # We perform a mean subtraction (127.5, 127.5, 127.5) to normalize the input;
+    # after executing this command our "blob" now has the shape:
+    # (1, 3, 300, 300)
+    blob = cv2.dnn.blobFromImage(frame_resized, 0.007843, (300, 300), (127.5, 127.5, 127.5), False)
+    #Set to network the input blob 
+    modelForPersonDetection.setInput(blob)
+    #Prediction of network
+    detections = modelForPersonDetection.forward()
+
+    frame_copy = image1.copy()
+    frame_copy2 = image1.copy()
+    #Size of frame resize (300x300)
+    cols = frame_resized.shape[1] 
+    rows = frame_resized.shape[0]
+
+     
+    opacity = 0.3
+    cv2.addWeighted(frame_copy, opacity, image1, 1 - opacity, 0, image1)
+
+    for i in range(detections.shape[2]):
+        confidence = detections[0, 0, i, 2] #Confidence of prediction 
+        if confidence > args.thr: # Filter prediction 
+            class_id = int(detections[0, 0, i, 1]) # Class label
+
+            # Object location 
+            xLeftBottom = int(detections[0, 0, i, 3] * cols) 
+            yLeftBottom = int(detections[0, 0, i, 4] * rows)
+            xRightTop   = int(detections[0, 0, i, 5] * cols)
+            yRightTop   = int(detections[0, 0, i, 6] * rows)
+
+            xLeftBottom_ = int(widthFactor * xLeftBottom) 
+            yLeftBottom_ = int(heightFactor* yLeftBottom)
+            xRightTop_   = int(widthFactor * xRightTop)
+            yRightTop_   = int(heightFactor * yRightTop)
+            cv2.rectangle(image1, (xLeftBottom_, yLeftBottom_), (xRightTop_, yRightTop_),(0,0,255))
+            #person = [xLeftBottom_, yLeftBottom_ ,xLeftBottom_ , yLeftBottom_]
+            personList.append([[xLeftBottom_, yLeftBottom_], [xRightTop_, yRightTop_], (yLeftBottom_ -yRightTop_) * (xLeftBottom_ -xRightTop_)] )
+    return  personList   
+
+
+
 
 image1 = cv2.imread(args.image_file)
-scale = 1
+scale = 6
 image1 = unblur(args.image_file,predictor,)
+findPeople(modelForPersonDetection,Image1)
 
 nPoints = 18
 # COCO Output Format
@@ -224,11 +278,11 @@ frameClone = image1.copy()
 
 
 font = cv2.FONT_HERSHEY_SIMPLEX
-
+fontscale = 1/3*scale
 for i in range(nPoints):
     for j in range(len(detected_keypoints[i])):
         cv2.circle(frameClone, detected_keypoints[i][j][0:2], 5, colors[i], -1, cv2.LINE_AA)
-        cv2.putText(frameClone,detected_keypoints[i][j][4], detected_keypoints[i][j][0:2], font, scale, colors[i], 2, cv2.LINE_AA, False)
+        cv2.putText(frameClone,detected_keypoints[i][j][4], detected_keypoints[i][j][0:2], font, fontscale, colors[i], 2, cv2.LINE_AA, False)
 #cv2.imshow("Keypoints",frameClone)
 
 
@@ -246,5 +300,5 @@ for i in range(17):
         cv2.line(frameClone, (B[0], A[0]), (B[1], A[1]), colors[i], 3, cv2.LINE_AA)
 
 
-cv2.imwrite(args.image_folder+"experiment.jpg" , frameClone)
+cv2.imwrite(args.image_folder+str(scale)+"experiment.jpg"  , frameClone)
 

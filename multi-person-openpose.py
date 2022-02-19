@@ -19,7 +19,7 @@ protoFile = args.protoFile
 weightsFile = args.weightsFile
 folder = args.image_folder
 predictor = Predictor(weights_path='/content/gdrive/MyDrive/yolov3/fpn_inception.h5')
-modelForPersonDetection = cv2.dnn.readNetFromCaffe("/content/gdrive/MyDrive/MobileNetSSDModel/MobileNetSSD_deploy.prototxt", "/content/gdrive/MyDrive/MobileNetSSDModel/MobileNetSSD_deploy.caffemodel")
+modelForPersonDetection = cv2.dnn.readNetFromCaffe("/content/gdrive/MyDrive/ModelForPersonDetection/MobileNetSSD_deploy.prototxt", "/content/gdrive/MyDrive/ModelForPersonDetection/MobileNetSSD_deploy.caffemodel")
 
 
 def findPeople(modelForPersonDetection,image1):
@@ -75,8 +75,11 @@ def findPeople(modelForPersonDetection,image1):
 
 image1 = cv2.imread(args.image_file)
 scale = 6
-image1 = unblur(args.image_file,predictor,)
-findPeople(modelForPersonDetection,Image1)
+image1 = cv2.resize(image1, None, fx=scale, fy=scale)
+cv2.imwrite(args.image_folder+str(scale)+"experiment.jpg"  , image1)
+
+image1 = unblur(args.image_folder+str(scale)+"experiment.jpg",predictor,)
+findPeople(modelForPersonDetection,image1)
 
 nPoints = 18
 # COCO Output Format

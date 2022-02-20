@@ -1,413 +1,272 @@
-import cv2
-import time
-import numpy as np
-from random import randint
+# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
+"""
+Run inference on images, videos, directories, streams, etc.
+
+Usage - sources:
+    $ python path/to/detect.py --weights yolov5s.pt --source 0              # webcam
+                                                             img.jpg        # image
+                                                             vid.mp4        # video
+                                                             path/          # directory
+                                                             path/*.jpg     # glob
+                                                             'https://youtu.be/Zgi9g1ksQHc'  # YouTube
+                                                             'rtsp://example.com/media.mp4'  # RTSP, RTMP, HTTP stream
+
+Usage - formats:
+    $ python path/to/detect.py --weights yolov5s.pt                 # PyTorch
+                                         yolov5s.torchscript        # TorchScript
+                                         yolov5s.onnx               # ONNX Runtime or OpenCV DNN with --dnn
+                                         yolov5s.xml                # OpenVINO
+                                         yolov5s.engine             # TensorRT
+                                         yolov5s.mlmodel            # CoreML (MacOS-only)
+                                         yolov5s_saved_model        # TensorFlow SavedModel
+                                         yolov5s.pb                 # TensorFlow GraphDef
+                                         yolov5s.tflite             # TensorFlow Lite
+                                         yolov5s_edgetpu.tflite     # TensorFlow Edge TPU
+"""
+
 import argparse
-from google.colab.patches import cv2_imshow
-import imutils
 import os
+import sys
+from pathlib import Path
 
-parser = argparse.ArgumentParser(description='Run keypoint detection')
-parser.add_argument("--device", default="gpu", help="Device to inference on")
-parser.add_argument("--image_file", default="group.jpg", help="Input image")
-parser.add_argument("--image_folder",  help="Input folder")
-parser.add_argument("--protoFile", default="group.jpg", help="Input image")
-parser.add_argument("--weightsFile", default="group.jpg", help="Input image")
-parser.add_argument("--thr", default=0.2, type=float, help="confidence threshold to filter out weak detections")
+import cv2
+import torch
+import torch.backends.cudnn as cudnn
 
-args = parser.parse_args()
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]  # YOLOv5 root directory
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-
-protoFile = args.protoFile
-weightsFile = args.weightsFile
-nPoints = 18
-# COCO Output Format
-keypointsMapping = ['Nose', 'Neck', 'R-Sho', 'R-Elb', 'R-Wr', 'L-Sho', 'L-Elb', 'L-Wr', 'R-Hip', 'R-Knee', 'R-Ank', 'L-Hip', 'L-Knee', 'L-Ank', 'R-Eye', 'L-Eye', 'R-Ear', 'L-Ear']
-
-POSE_PAIRS = [[1,2], [1,5], [2,3], [3,4], [5,6], [6,7],
-              [1,8], [8,9], [9,10], [1,11], [11,12], [12,13],
-              [1,0], [0,14], [14,16], [0,15], [15,17],
-              [2,17], [5,16] ]
-
-# index of pafs correspoding to the POSE_PAIRS
-# e.g for POSE_PAIR(1,2), the PAFs are located at indices (31,32) of output, Similarly, (1,5) -> (39,40) and so on.
-mapIdx = [[31,32], [39,40], [33,34], [35,36], [41,42], [43,44],
-          [19,20], [21,22], [23,24], [25,26], [27,28], [29,30],
-          [47,48], [49,50], [53,54], [51,52], [55,56],
-          [37,38], [45,46]]
-
-colors = [ [0,100,255], [0,100,255], [0,255,255], [0,100,255], [0,255,255], [0,100,255],
-         [0,255,0], [255,200,100], [255,0,255], [0,255,0], [255,200,100], [255,0,255],
-         [0,0,255], [255,0,0], [200,200,0], [255,0,0], [200,200,0], [0,0,0]]
+from models.common import DetectMultiBackend
+from utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
+from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr,
+                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
+from utils.plots import Annotator, colors, save_one_box
+from utils.torch_utils import select_device, time_sync
 
 
-# Labels of Network.
-classNames = { 15: 'person'}
+@torch.no_grad()
+def run(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
+        source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
+        data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
+        imgsz=(640, 640),  # inference size (height, width)
+        conf_thres=0.25,  # confidence threshold
+        iou_thres=0.45,  # NMS IOU threshold
+        max_det=1000,  # maximum detections per image
+        device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
+        view_img=False,  # show results
+        save_txt=False,  # save results to *.txt
+        save_conf=False,  # save confidences in --save-txt labels
+        save_crop=False,  # save cropped prediction boxes
+        nosave=False,  # do not save images/videos
+        classes=None,  # filter by class: --class 0, or --class 0 2 3
+        agnostic_nms=False,  # class-agnostic NMS
+        augment=False,  # augmented inference
+        visualize=False,  # visualize features
+        update=False,  # update all models
+        project=ROOT / 'runs/detect',  # save results to project/name
+        name='exp',  # save results to project/name
+        exist_ok=False,  # existing project/name ok, do not increment
+        line_thickness=3,  # bounding box thickness (pixels)
+        hide_labels=False,  # hide labels
+        hide_conf=False,  # hide confidences
+        half=False,  # use FP16 half-precision inference
+        dnn=False,  # use OpenCV DNN for ONNX inference
+        dir_save='',  #location to save images
+        ):
+    source = str(source)
+    save_img = not nosave and not source.endswith('.txt')  # save inference images
+    is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
+    is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
+    webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
+    if is_url and is_file:
+        source = check_file(source)  # download
+
+    # Directories
+    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+
+    # Load model
+    device = select_device(device)
+    model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data)
+    stride, names, pt, jit, onnx, engine = model.stride, model.names, model.pt, model.jit, model.onnx, model.engine
+    imgsz = check_img_size(imgsz, s=stride)  # check image size
+
+    # Half
+    half &= (pt or jit or onnx or engine) and device.type != 'cpu'  # FP16 supported on limited backends with CUDA
+    if pt or jit:
+        model.model.half() if half else model.model.float()
+
+    # Dataloader
+    if webcam:
+        view_img = check_imshow()
+        cudnn.benchmark = True  # set True to speed up constant image size inference
+        dataset = LoadStreams(source, img_size=imgsz, stride=stride, auto=pt)
+        bs = len(dataset)  # batch_size
+    else:
+        dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
+        bs = 1  # batch_size
+    vid_path, vid_writer = [None] * bs, [None] * bs
+
+    # Run inference
+    model.warmup(imgsz=(1 if pt else bs, 3, *imgsz), half=half)  # warmup
+    dt, seen = [0.0, 0.0, 0.0], 0
+    for path, im, im0s, vid_cap, s in dataset:
+        t1 = time_sync()
+        im = torch.from_numpy(im).to(device)
+        im = im.half() if half else im.float()  # uint8 to fp16/32
+        im /= 255  # 0 - 255 to 0.0 - 1.0
+        if len(im.shape) == 3:
+            im = im[None]  # expand for batch dim
+        t2 = time_sync()
+        dt[0] += t2 - t1
+
+        # Inference
+        visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
+        pred = model(im, augment=augment, visualize=visualize)
+        t3 = time_sync()
+        dt[1] += t3 - t2
+
+        # NMS
+        pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+        dt[2] += time_sync() - t3
+
+        # Second-stage classifier (optional)
+        # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
+
+        # Process predictions
+        for i, det in enumerate(pred):  # per image
+            seen += 1
+            if webcam:  # batch_size >= 1
+                p, im0, frame = path[i], im0s[i].copy(), dataset.count
+                s += f'{i}: '
+            else:
+                p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
+
+            p = Path(p)  # to Path
+            save_path = str(save_dir / p.name)  # im.jpg
+            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
+            s += '%gx%g ' % im.shape[2:]  # print string
+            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+            imc = im0.copy() if save_crop else im0  # for save_crop
+            annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+            if len(det):
+                # Rescale boxes from img_size to im0 size
+                det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
+
+                # Print results
+                for c in det[:, -1].unique():
+                    n = (det[:, -1] == c).sum()  # detections per class
+                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+
+                # Write results
+                for *xyxy, conf, cls in reversed(det):
+                    if save_txt:  # Write to file
+                        print("save_txt is true")
+                        
+                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                        
+                        line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
+                        # with open(dir_save+"/"+p.name.split('.')[0] + '.txt', 'a') as f:
+                        #     f.write(('%g ' * len(line)).rstrip() % line + '\n')
+                        c = int(cls)  # integer class
+                        label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                        annotator.box_label(xyxy, label, color=colors(c, True))
+                        coord = save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                        with open(dir_save+"/"+p.name.split('.')[0] + '.txt', 'a') as f:
+                             f.write(str(coord) +":")
+                    if save_img or save_crop or view_img:  # Add bbox to image
+                        c = int(cls)  # integer class
+                        label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                        annotator.box_label(xyxy, label, color=colors(c, True))
+                        if save_crop:
+                            print("for now not cropping")
+                            #save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+
+            # Stream results
+            im0 = annotator.result()
+            if view_img:
+                cv2.imshow(str(p), im0)
+                cv2.waitKey(1)  # 1 millisecond
+
+            # Save results (image with detections)
+            if save_img:
+                if dataset.mode == 'image':
+                    #cv2.imwrite(save_path, im0)
+                    cv2.imwrite(dir_save+"/"+p.name, im0)
+                else:  # 'video' or 'stream'
+                    if vid_path[i] != save_path:  # new video
+                        vid_path[i] = save_path
+                        if isinstance(vid_writer[i], cv2.VideoWriter):
+                            vid_writer[i].release()  # release previous video writer
+                        if vid_cap:  # video
+                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        else:  # stream
+                            fps, w, h = 30, im0.shape[1], im0.shape[0]
+                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                        vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    vid_writer[i].write(im0)
+
+        # Print time (inference-only)
+        LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
+
+    # Print results
+    t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
+    LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
+    if save_txt or save_img:
+        s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
+        LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
+        LOGGER.info(dir_save+"/"+p.name)
+
+        
+    if update:
+        strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
 
 
-def findPeople(modelForPersonDetection,image1):
-# Load image fro
-    personList = []
-    frame_resized = cv2.resize(image1,(300,300)) # resize frame for prediction
-    heightFactor = image1.shape[0]/300.0
-    widthFactor = image1.shape[1]/300.0 
-    # MobileNet requires fixed dimensions for input image(s)
-    # so we have to ensure that it is resized to 300x300 pixels.
-    # set a scale factor to image because network the objects has differents size. 
-    # We perform a mean subtraction (127.5, 127.5, 127.5) to normalize the input;
-    # after executing this command our "blob" now has the shape:
-    # (1, 3, 300, 300)
-    blob = cv2.dnn.blobFromImage(frame_resized, 0.007843, (300, 300), (127.5, 127.5, 127.5), False)
-    #Set to network the input blob 
-    modelForPersonDetection.setInput(blob)
-    #Prediction of network
-    detections = modelForPersonDetection.forward()
-
-    frame_copy = image1.copy()
-    frame_copy2 = image1.copy()
-    #Size of frame resize (300x300)
-    cols = frame_resized.shape[1] 
-    rows = frame_resized.shape[0]
-
-     
-    opacity = 0.3
-    cv2.addWeighted(frame_copy, opacity, image1, 1 - opacity, 0, image1)
-
-    for i in range(detections.shape[2]):
-        confidence = detections[0, 0, i, 2] #Confidence of prediction 
-        if confidence > args.thr: # Filter prediction 
-            class_id = int(detections[0, 0, i, 1]) # Class label
-
-            # Object location 
-            xLeftBottom = int(detections[0, 0, i, 3] * cols) 
-            yLeftBottom = int(detections[0, 0, i, 4] * rows)
-            xRightTop   = int(detections[0, 0, i, 5] * cols)
-            yRightTop   = int(detections[0, 0, i, 6] * rows)
-
-            xLeftBottom_ = int(widthFactor * xLeftBottom) 
-            yLeftBottom_ = int(heightFactor* yLeftBottom)
-            xRightTop_   = int(widthFactor * xRightTop)
-            yRightTop_   = int(heightFactor * yRightTop)
-            cv2.rectangle(image1, (xLeftBottom_, yLeftBottom_), (xRightTop_, yRightTop_),(0,0,255))
-            #person = [xLeftBottom_, yLeftBottom_ ,xLeftBottom_ , yLeftBottom_]
-            personList.append([[xLeftBottom_, yLeftBottom_], [xRightTop_, yRightTop_], (yLeftBottom_ -yRightTop_) * (xLeftBottom_ -xRightTop_)] )
-    return  personList   
-            
+def parse_opt():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model path(s)')
+    parser.add_argument('--source', type=str, default=ROOT / 'data/images', help='file/dir/URL/glob, 0 for webcam')
+    parser.add_argument('--data', type=str, default=ROOT / 'data/coco128.yaml', help='(optional) dataset.yaml path')
+    parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
+    parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
+    parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
+    parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
+    parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--view-img', action='store_true', help='show results')
+    parser.add_argument('--save-txt', action='store_false', help='save results to *.txt')
+    parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
+    parser.add_argument('--save-crop', action='store_true', help='save cropped prediction boxes')
+    parser.add_argument('--nosave', action='store_true', help='do not save images/videos')
+    parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --classes 0, or --classes 0 2 3')
+    parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
+    parser.add_argument('--augment', action='store_true', help='augmented inference')
+    parser.add_argument('--visualize', action='store_true', help='visualize features')
+    parser.add_argument('--update', action='store_true', help='update all models')
+    parser.add_argument('--project', default=ROOT / 'runs/detect', help='save results to project/name')
+    parser.add_argument('--name', default='exp', help='save results to project/name')
+    parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+    parser.add_argument('--line-thickness', default=3, type=int, help='bounding box thickness (pixels)')
+    parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels')
+    parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
+    parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
+    parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
+    parser.add_argument('--dir-save', default ='', help='save dir')
+    opt = parser.parse_args()
+    opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
+    print_args(FILE.stem, opt)
+    return opt
 
 
-def getKeypoints(probMap, threshold=0.1):
-
-    mapSmooth = cv2.GaussianBlur(probMap,(3,3),0,0)
-
-    mapMask = np.uint8(mapSmooth>threshold)
-    keypoints = []
-
-    #find the blobs
-    contours, _ = cv2.findContours(mapMask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-    #for each blob find the maxima
-    for cnt in contours:
-        blobMask = np.zeros(mapMask.shape)
-        blobMask = cv2.fillConvexPoly(blobMask, cnt, 1)
-        maskedProbMap = mapSmooth * blobMask
-        _, maxVal, _, maxLoc = cv2.minMaxLoc(maskedProbMap)
-        keypoints.append(maxLoc + (probMap[maxLoc[1], maxLoc[0]],))
-
-    return keypoints
+def main(opt):
+    check_requirements(exclude=('tensorboard', 'thop'))
+    run(**vars(opt))
 
 
-# Find valid connections between the different joints of a all persons present
-def getValidPairs(output,frameWidth,frameHeight,detected_keypoints):
-    valid_pairs = []
-    invalid_pairs = []
-    n_interp_samples = 10
-    paf_score_th = 0.1
-    conf_th = 0.7
-    # loop for every POSE_PAIR
-    for k in range(len(mapIdx)):
-        # A->B constitute a limb
-        pafA = output[0, mapIdx[k][0], :, :]
-        pafB = output[0, mapIdx[k][1], :, :]
-        pafA = cv2.resize(pafA, (frameWidth, frameHeight))
-        pafB = cv2.resize(pafB, (frameWidth, frameHeight))
-
-        # Find the keypoints for the first and second limb
-        candA = detected_keypoints[POSE_PAIRS[k][0]]
-        candB = detected_keypoints[POSE_PAIRS[k][1]]
-        nA = len(candA)
-        nB = len(candB)
-
-        # If keypoints for the joint-pair is detected
-        # check every joint in candA with every joint in candB
-        # Calculate the distance vector between the two joints
-        # Find the PAF values at a set of interpolated points between the joints
-        # Use the above formula to compute a score to mark the connection valid
-
-        if( nA != 0 and nB != 0):
-            valid_pair = np.zeros((0,3))
-            for i in range(nA):
-                max_j=-1
-                maxScore = -1
-                found = 0
-                for j in range(nB):
-                    # Find d_ij
-                    d_ij = np.subtract(candB[j][:2], candA[i][:2])
-                    norm = np.linalg.norm(d_ij)
-                    if norm:
-                        d_ij = d_ij / norm
-                    else:
-                        continue
-                    # Find p(u)
-                    interp_coord = list(zip(np.linspace(candA[i][0], candB[j][0], num=n_interp_samples),
-                                            np.linspace(candA[i][1], candB[j][1], num=n_interp_samples)))
-                    # Find L(p(u))
-                    paf_interp = []
-                    for k in range(len(interp_coord)):
-                        paf_interp.append([pafA[int(round(interp_coord[k][1])), int(round(interp_coord[k][0]))],
-                                           pafB[int(round(interp_coord[k][1])), int(round(interp_coord[k][0]))] ])
-                    # Find E
-                    paf_scores = np.dot(paf_interp, d_ij)
-                    avg_paf_score = sum(paf_scores)/len(paf_scores)
-
-                    # Check if the connection is valid
-                    # If the fraction of interpolated vectors aligned with PAF is higher then threshold -> Valid Pair
-                    if ( len(np.where(paf_scores > paf_score_th)[0]) / n_interp_samples ) > conf_th :
-                        if avg_paf_score > maxScore:
-                            max_j = j
-                            maxScore = avg_paf_score
-                            found = 1
-                # Append the connection to the list
-                if found:
-                    valid_pair = np.append(valid_pair, [[candA[i][3], candB[max_j][3], maxScore]], axis=0)
-
-            # Append the detected connections to the global list
-            valid_pairs.append(valid_pair)
-        else: # If no keypoints are detected
-            print("No Connection : k = {}".format(k))
-            invalid_pairs.append(k)
-            valid_pairs.append([])
-    return valid_pairs, invalid_pairs
-
-
-
-# This function creates a list of keypoints belonging to each person
-# For each detected valid pair, it assigns the joint(s) to a person
-def getPersonwiseKeypoints(valid_pairs, invalid_pairs,keypoints_list):
-    # the last number in each row is the overall score
-    personwiseKeypoints = -1 * np.ones((0, 19))
-
-    for k in range(len(mapIdx)):
-        if k not in invalid_pairs:
-            partAs = valid_pairs[k][:,0]
-            partBs = valid_pairs[k][:,1]
-            indexA, indexB = np.array(POSE_PAIRS[k])
-
-            for i in range(len(valid_pairs[k])):
-                found = 0
-                person_idx = -1
-                for j in range(len(personwiseKeypoints)):
-                    if personwiseKeypoints[j][indexA] == partAs[i]:
-                        person_idx = j
-                        found = 1
-                        break
-
-                if found:
-                    personwiseKeypoints[person_idx][indexB] = partBs[i]
-                    personwiseKeypoints[person_idx][-1] += keypoints_list[partBs[i].astype(int), 2] + valid_pairs[k][i][2]
-
-                # if find no partA in the subset, create a new subset
-                elif not found and k < 17:
-                    row = -1 * np.ones(19)
-                    row[indexA] = partAs[i]
-                    row[indexB] = partBs[i]
-                    # add the keypoint_scores for the two keypoints and the paf_score
-                    row[-1] = sum(keypoints_list[valid_pairs[k][i,:2].astype(int), 2]) + valid_pairs[k][i][2]
-                    personwiseKeypoints = np.vstack([personwiseKeypoints, row])
-    return personwiseKeypoints
-
-def processImage(image1,imageName,modelForPersonDetection):
-    frameWidth = image1.shape[1]
-    frameHeight = image1.shape[0]
-
-    # Fix the input Height and get the width according to the Aspect Ratio
-    inHeight = 368
-    inWidth = int((inHeight/frameHeight)*frameWidth)
-
-    inpBlob = cv2.dnn.blobFromImage(image1, 1.0 / 255, (inWidth, inHeight),
-                              (0, 0, 0), swapRB=False, crop=False)
-
-    net.setInput(inpBlob)
-    output = net.forward()
-    print("Time Taken in forward pass = {}".format(time.time() - t))
-
-    detected_keypoints = []
-    keypoints_list = np.zeros((0,3))
-    keypoint_id = 0
-    threshold = 0.1
-    pointsWithPartCollection = []
-    pointsWithParts = []
-    for part in range(nPoints):
-        probMap = output[0,part,:,:]
-        probMap = cv2.resize(probMap, (image1.shape[1], image1.shape[0]))
-        keypoints = getKeypoints(probMap, threshold)
-        print("Keypoints - {} : {}".format(keypointsMapping[part], keypoints))
-        if "Elb" in keypointsMapping[part] or "Wr" in keypointsMapping[part]:
-            pointsWithParts = [keypointsMapping[part],[keypoints[0][0],keypoints[0][1]]]
-            pointsWithPartCollection.append(pointsWithParts)
-
-        keypoints_with_id = []
-        for i in range(len(keypoints)):
-            keypoints_with_id.append(keypoints[i] + (keypoint_id,))
-            keypoints_list = np.vstack([keypoints_list, keypoints[i]])
-            keypoint_id += 1
-
-        detected_keypoints.append(keypoints_with_id)
-
-
-    frameClone = image1.copy()
-    
-
-    counter = 0
-    valid_pairs, invalid_pairs = getValidPairs(output,frameWidth,frameHeight,detected_keypoints)
-    print("pointsWithPartCollection",pointsWithPartCollection)
-    personwiseKeypoints = getPersonwiseKeypoints(valid_pairs, invalid_pairs,keypoints_list)
-    pairWiseKeyPointsFound = []
-    pairWiseKeyPointsFoundCollection = []
-    pointsNotFoundInPairs = []
-    for i in range(17):
-        for n in range(len(personwiseKeypoints)):
-            index = personwiseKeypoints[n][np.array(POSE_PAIRS[i])]
-            if -1 in index:
-                continue
-            B = np.int32(keypoints_list[index.astype(int), 0])
-            A = np.int32(keypoints_list[index.astype(int), 1])
-            
-
-            if ("Elb" in keypointsMapping[POSE_PAIRS[i][0]]) or ("Wr" in keypointsMapping[POSE_PAIRS[i][0]]):
-                pairWiseKeyPointsFound = [keypointsMapping[POSE_PAIRS[i][0]],[B[0],A[0]]]
-                pairWiseKeyPointsFoundCollection.append(pairWiseKeyPointsFound)
-            
-            if ("Elb" in keypointsMapping[POSE_PAIRS[i][1]]) or ("Wr" in keypointsMapping[POSE_PAIRS[i][1]]):
-                pairWiseKeyPointsFound = [keypointsMapping[POSE_PAIRS[i][1]],[B[1],A[1]]]
-                pairWiseKeyPointsFoundCollection.append(pairWiseKeyPointsFound)
-
-            #cropping
-            if "Elb" in keypointsMapping[POSE_PAIRS[i][0]] and "Wr" in keypointsMapping[POSE_PAIRS[i][1]]:
-                distance = ((((B[1] - B[0] )**2) + ((A[1]-A[0])**2) )**0.5)
-                height, width = frameClone.shape[:2]
-                print("Elb", B[0],A[0])
-                print("Wr", B[1],A[1])
-                x1,x2,y1,y2 = 0,0,0,0
-                # if B[1] >= B[0]:
-                #     x1  =  B[1];
-                #     x2  =  width if int(B[1]+distance) > width else int(B[1]+distance)
-                # else:
-                #     x1  =  0 if int(B[1]-distance) < 0 else int(B[1]-distance)
-                #     x2  =  B[1]    
-
-                # if A[1] >= A[0]:
-                #     print("inside A[1] >= A[0]")
-                #     y1  =  A[1] - int(distance)
-                #     y2  =  height if A[1]+int(distance) > height else A[1]+int(distance) 
-                # else:
-                #     print("inside A[1] < A[0]")
-                #     y1  =  0 if A[1]+int(distance)  < 0 else A[1]+ int(distance)  
-                #     y2  =  A[1] + int(distance)       
-                
-                print("Wr",keypointsMapping[POSE_PAIRS[i][1]])
-                
-                print("distance",distance)
-                
-                y1  = 0 if int(A[1]-distance)  < 0 else int(A[1]-distance)  
-                #y2  = height if int(A[1]+distance) > height else int(A[1]+distance) 
-                y2  = height
-                x1  =  0 if int(B[1]-distance) < 0 else int(B[1]-distance)
-                #x2  =  width if int(B[1]+distance) > width else int(B[1]+distance)
-                x2  =  width 
-                print("y1,y2,x1,x2", y1,y2,x1,x2)
-                croppedImage = frameClone[y1:y2,x1:x2]
-                imgname = imageName.rsplit( ".", 1 )[ 0 ] + "_" + str(counter)+".jpg";
-                print(imgname)
-                #cv2.imwrite(args.image_folder+imgname , croppedImage)
-                counter = counter + 1
-                #saving logic
-                
-            
-
-    # code for finding the points not in pair
-    pointFound = False
-    for i in range(len(pointsWithPartCollection)):
-        for j in range(len(pairWiseKeyPointsFoundCollection)):
-            if str(pointsWithPartCollection[i][0]) == (pairWiseKeyPointsFoundCollection[j][0]):
-                if pointsWithPartCollection[i][1] == pairWiseKeyPointsFoundCollection[j][1]:
-                    pointFound = True
-                    break
-        if pointFound == False:
-            pointsNotFoundInPairs.append(pointsWithPartCollection[i])
-        else:
-            pointsNotFoundInPairs.append(pointsWithPartCollection[i])
-            pointFound = False
-
-    personList = findPeople(modelForPersonDetection, image1)
-    #finding the right person box for the point that are not found in pairs
-    for i in range(len(pointsNotFoundInPairs)):
-        for j in range(len(personList)):
-            if pointsNotFoundInPairs[i][1][0] > personList[j][0][0] and pointsNotFoundInPairs[i][1][0] < personList[j][1][0] and pointsNotFoundInPairs[i][1][1] > personList[j][0][1]  and pointsNotFoundInPairs[i][1][1] < personList[j][1][1]: 
-                print("pointsNotFoundInPairs",pointsNotFoundInPairs[i])
-                print("personList",personList[j])
-                print("pointsNotFoundInPairs[i][1][0] > personList[j][0][0]",pointsNotFoundInPairs[i][1][0],personList[j][0][0])
-                #print("personList[j][0][0]",personList[j][0][0])
-                print("pointsNotFoundInPairs[i][1][0] > personList[j][1][0]",pointsNotFoundInPairs[i][1][0],personList[j][1][0])
-                #print("personList[j][1][0]",personList[j][1][0])
-                print("pointsNotFoundInPairs[i][1][1] < personList[j][0][1]",pointsNotFoundInPairs[i][1][1],personList[j][0][1])
-                #print("personList[j][0][1]",personList[j][0][1])
-                print("pointsNotFoundInPairs[i][1][1] < personList[j][1][1]",pointsNotFoundInPairs[i][1][1],personList[j][1][1])
-                #print("personList[j][1][1]",personList[j][1][1]) 
-                print("----------------------------------------------") 
-                
-                x1=int(personList[j][0][0])
-                x2=int(personList[j][1][0])
-                y1=int(int(personList[j][0][1]))
-                y2=int(int(personList[j][1][1]))
-                distance = (x2 - x1) /3
-                distance = distance if distance>0 else distance*-1
-                print(distance)
-                print(pointsNotFoundInPairs[i][1][1],pointsNotFoundInPairs[i][1][0])
-                y1  = 0 if int(pointsNotFoundInPairs[i][1][1]-distance)  < 0 else int(pointsNotFoundInPairs[i][1][1]-distance)  
-                y2  = height if int(pointsNotFoundInPairs[i][1][1]+distance) > height else int(pointsNotFoundInPairs[i][1][1]+distance) 
-                x1  =  0 if int(pointsNotFoundInPairs[i][1][0]-distance) < 0 else int(pointsNotFoundInPairs[i][1][0]-distance)
-                x2  =  width if int(pointsNotFoundInPairs[i][1][0]+distance) > width else int(pointsNotFoundInPairs[i][1][0]+distance)
-                croppedImage = frameClone[y1:y2,x1:x2]
-                imgname = imageName.rsplit( ".", 1 )[ 0 ] + "_" + str(counter)+".jpg";
-                print(imgname)
-                cv2.imwrite(args.image_folder+imgname , croppedImage)
-                counter = counter + 1
-
-
-#print("pointsNotFoundInPairs",pointsNotFoundInPairs)         
-#cv2.imwrite("result1.jpg" , frameClone)
-#cv2.waitKey(0)
-
-t = time.time()
-net = cv2.dnn.readNetFromCaffe(protoFile, weightsFile)
-if args.device == "cpu":
-    net.setPreferableBackend(cv2.dnn.DNN_TARGET_CPU)
-    print("Using CPU device")
-elif args.device == "gpu":
-    net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
-    net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
-    print("Using GPU device")
-#Load the Caffe model 
-modelForPersonDetection = cv2.dnn.readNetFromCaffe("/content/gdrive/MyDrive/MobileNetSSDModel/MobileNetSSD_deploy.prototxt", "/content/gdrive/MyDrive/MobileNetSSDModel/MobileNetSSD_deploy.caffemodel")
-
-#image1 = cv2.imread(args.image_folder)
-#predictor = Predictor(weights_path='fpn_inception.h5')
-#print(predictor)
-for filename in os.listdir(args.image_folder):
-    print("filename",filename)
-    img = cv2.imread(os.path.join(args.image_folder,filename))
-    processImage(img,filename,modelForPersonDetection)
-
-
-
-
+if __name__ == "__main__":
+    opt = parse_opt()
+    main(opt)

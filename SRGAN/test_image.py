@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--image', type=str, help='input image')
+parser.add_argument('--out_dir', type=str, help='out_dir image')
 parser.add_argument('--upscale_factor', type=int, default=4, choices=[2,4,8], help='super resolution upscale factor')
 parser.add_argument('--weight', type=str, help='generator weight file')
 parser.add_argument('--downsample', type=str, default=None, choices=[None, 'bicubic'], help='Downsample the input image before applying SR')
@@ -21,8 +22,9 @@ if __name__ == '__main__':
 	upscale_factor = opt.upscale_factor
 	input_img = opt.image
 	weight = opt.weight
-	out_dir = 'results/'+input_img[input_img.rfind('/')+1:input_img.find('.')]
-	os.makedirs(out_dir, exist_ok=True)
+  
+	out_dir = opt.out_dir
+	#os.makedirs(out_dir, exist_ok=True)
 
 	if not torch.cuda.is_available() and opt.cuda:
 		raise Exception("No GPU available")
@@ -59,14 +61,14 @@ if __name__ == '__main__':
 
 		sr_img.save(out_dir+'/sr_' + input_img[input_img.rfind('/')+1:])
 
-		w, h = img.size 
-		w *= upscale_factor
-		h *= upscale_factor
+		#w, h = img.size 
+		#w *= upscale_factor
+		#h *= upscale_factor
 
-		upscale = transforms.Resize((h,w), interpolation=Image.BICUBIC)
-		lr_img = upscale(img)
-		lr_img.save(out_dir+'/bicubic_' + input_img[input_img.rfind('/')+1:])
-		img.save(out_dir+'/lr_'+input_img[input_img.rfind('/')+1:])
+		#upscale = transforms.Resize((h,w), interpolation=Image.BICUBIC)
+		#lr_img = upscale(img)
+		#lr_img.save(out_dir+'/bicubic_' + input_img[input_img.rfind('/')+1:])
+		#img.save(out_dir+'/lr_'+input_img[input_img.rfind('/')+1:])
 
 
 

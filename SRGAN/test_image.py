@@ -10,7 +10,8 @@ import torchvision.transforms as transforms
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--image', type=str, help='input image')
-parser.add_argument('--out_dir', type=str, help='out_dir image')
+parser.add_argument('--input_dir', type=str, help='input_dir image')
+parser.add_argument('--output_dir', type=str, help='input_dir image')
 parser.add_argument('--upscale_factor', type=int, default=4, choices=[2,4,8], help='super resolution upscale factor')
 parser.add_argument('--weight', type=str, help='generator weight file')
 parser.add_argument('--downsample', type=str, default=None, choices=[None, 'bicubic'], help='Downsample the input image before applying SR')
@@ -23,43 +24,47 @@ if __name__ == '__main__':
 	input_img = opt.image
 	weight = opt.weight
   
-	out_dir = opt.out_dir
+	input_dir = opt.input_dir
+
+
+
 	#os.makedirs(out_dir, exist_ok=True)
 
 	if not torch.cuda.is_available() and opt.cuda:
 		raise Exception("No GPU available")
 	with torch.no_grad():
 		generator_net = Generator(upscale_factor = upscale_factor, num_blocks=16).eval()
-		
-
 		saved_G_weight = torch.load(weight) 
 		generator_net.load_state_dict(saved_G_weight)
 
+files = os.listdir(input_dir)
+for file in files:
+    img = Image.open(input_dir+"/"+file)
+    print("file found "+ str(file))
+    img_format = img.format
+    if opt.downsample == 'bicubic':
+      size = np.min(img.size)
+      downscale = transforms.Resize(int(size//upscale_factor), interpolation=Image.BICUBIC)
+      img = downscale(img)
 
-		img = Image.open(input_img)
-		img_format = img.format
-		if opt.downsample == 'bicubic':
-			size = np.min(img.size)
-			downscale = transforms.Resize(int(size//upscale_factor), interpolation=Image.BICUBIC)
-			img = downscale(img)
+    img_tensor = transforms.ToTensor()(img).unsqueeze(0)
+    if torch.cuda.is_available() and opt.cuda:
+      img_tensor = img_tensor.cuda()
+      generator_net.cuda()
 
-		img_tensor = transforms.ToTensor()(img).unsqueeze(0)
-		if torch.cuda.is_available() and opt.cuda:
-			img_tensor = img_tensor.cuda()
-			generator_net.cuda()
+    sr_tensor = generator_net(img_tensor)
 
-		sr_tensor = generator_net(img_tensor)
-		
-		sr_transform = transforms.Compose([
-			transforms.Normalize((-1,-1,-1),(2,2,2)),
-			transforms.ToPILImage()
-			])
+    sr_transform = transforms.Compose([
+      transforms.Normalize((-1,-1,-1),(2,2,2)),
+      transforms.ToPILImage()
+      ])
 
 
-		sr_img = sr_transform(sr_tensor[0].data.cpu())
+    sr_img = sr_transform(sr_tensor[0].data.cpu())
 
 
-		sr_img.save(out_dir+'/sr_' + input_img[input_img.rfind('/')+1:])
+    sr_img.save(opt.output_dir +'/sr_' + file )
+    print("file saved at "+  opt.output_dir+'/sr_' + file)
 
 		#w, h = img.size 
 		#w *= upscale_factor
